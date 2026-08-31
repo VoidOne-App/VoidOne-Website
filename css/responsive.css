@@ -1,0 +1,8 @@
+/* Responsive overrides are kept separate so the layout can evolve without touching core components. */
+@media (max-width: 820px) {
+  .shell { width: min(var(--max), calc(100% - 32px)); }
+}
+@media (max-width: 520px) {
+  .button { width: 100%; }
+  .actions { width: 100%; }
+}
