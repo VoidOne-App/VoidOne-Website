@@ -1,0 +1,12 @@
+/*
+  Content-Security-Policy is intentionally conservative for a static site.
+  GitHub API access is allowed because the site reads public release metadata.
+*/
+/*
+  Static hosts may apply these headers directly.
+*/
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+*/
