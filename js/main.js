@@ -9,4 +9,11 @@
       target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     });
   });
+
+  const nav = document.querySelector('.nav');
+  if (nav) {
+    const updateNav = () => nav.classList.toggle('scrolled', window.scrollY > 24);
+    updateNav();
+    window.addEventListener('scroll', updateNav, { passive: true });
+  }
 })();
