@@ -1,0 +1,5 @@
+[
+  {"date":"2025-10-12","title":"Genesis","description":"VoidOne begins. The public history starts here."},
+  {"date":"2026-08-29","title":"Beta-era engineering","description":"The project reaches a mature development phase with packaging, CI/CD, diagnostics and hardening work visible in its public history."},
+  {"date":"2026-08-30","title":"Hardening","description":"Recent work focuses on reliability, runtime safety and release engineering."}
+]

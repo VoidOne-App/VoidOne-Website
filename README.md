@@ -1,27 +1,49 @@
 # VoidOne Website
 
-Official website for **VoidOne — an open-source native PC gaming platform built around games, not a store.**
+Official public website for **VoidOne — an open-source native PC gaming platform built around games, not a store.**
 
-## Scope
+## Structure
 
-This repository contains the static public-facing website. The site is intentionally separate from the main VoidOne application repository.
+```text
+VoidOne-Website/
+├── index.html
+├── 404.html
+├── assets/
+│   ├── images/
+│   ├── icons/
+│   └── fonts/
+├── css/
+│   ├── variables.css
+│   ├── main.css
+│   └── responsive.css
+├── js/
+│   ├── main.js
+│   ├── github-api.js
+│   └── evolution.js
+├── data/
+│   └── evolution.json
+├── _headers
+└── README.md
+```
 
-- Main project: https://github.com/VoidOne-App/VoidOne
-- Releases: https://github.com/VoidOne-App/VoidOne/releases
-- Git history: https://github.com/VoidOne-App/VoidOne/commits/main
+## Principles
 
-## Design principles
-
-- Reflect the current implementation instead of inventing capabilities.
-- Clearly distinguish implemented, experimental, and planned work.
-- Keep the site lightweight and static-first.
-- Remain deployable on Cloudflare Pages without a required application backend.
-- Keep links to the canonical source, releases, build documentation, security guidance, and contribution workflow.
+- Reflect the current VoidOne implementation instead of inventing capabilities.
+- Keep implemented, experimental and planned work distinct.
+- Stay static-first and dependency-light.
+- Keep the site independent from the main application repository.
+- Use the main VoidOne repository as the canonical source for code, releases and history.
 
 ## Local preview
 
-Serve this directory with any static HTTP server, or open `index.html` directly for a quick preview.
+Serve the repository with any static HTTP server. No framework or application backend is required.
 
 ## Deployment
 
-The site is designed for Cloudflare Pages. No framework or build step is required for the initial static version.
+The site is designed for Cloudflare Pages. The repository contains only static HTML, CSS, JavaScript and data files, so it can be deployed without a build step.
+
+## Canonical project
+
+- Source: https://github.com/VoidOne-App/VoidOne
+- Releases: https://github.com/VoidOne-App/VoidOne/releases
+- History: https://github.com/VoidOne-App/VoidOne/commits/main
