@@ -1,3 +1,7 @@
+function escapeHTML(value) {
+  return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+}
+
 async function loadEvolution(targetSelector = '#evolution-list') {
   const target = document.querySelector(targetSelector);
   if (!target) return;
@@ -7,10 +11,10 @@ async function loadEvolution(targetSelector = '#evolution-list') {
     const entries = await response.json();
     target.innerHTML = entries.map((entry) => `
       <article class="timeline-item">
-        <time>${entry.date}</time>
-        <div><h3>${entry.title}</h3><p>${entry.description}</p></div>
+        <time>${escapeHTML(entry.date)}</time>
+        <div><h3>${escapeHTML(entry.title)}</h3><p>${escapeHTML(entry.description)}</p></div>
       </article>`).join('');
-  } catch (error) {
+  } catch (_) {
     target.innerHTML = '<p>Evolution data is temporarily unavailable.</p>';
   }
 }
