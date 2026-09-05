@@ -48,35 +48,24 @@ jobs:
         run: |
           set -euo pipefail
           required=(
-            index.html
-            404.html
-            downloads.html
-            developers.html
-            about.html
-            faq.html
+            index.html 404.html downloads.html developers.html about.html faq.html
             _headers
-            css/variables.css
-            css/main.css
-            css/responsive.css
-            js/main.js
-            js/github-api.js
-            js/evolution.js
-            data/evolution.json
-            assets/icons/favicon.svg
+            css/variables.css css/main.css css/responsive.css
+            js/main.js js/github-api.js js/evolution.js
+            data/evolution.json assets/icons/favicon.svg
           )
 
           missing=()
           for file in "${required[@]}"; do
-            if [[ ! -f "$file" ]]; then
-              missing+=("$file")
-            fi
+            [[ -f "$file" ]] || missing+=("$file")
           done
 
           if (( ${#missing[@]} )); then
-            printf '::error::Missing required files:\n%s\n' "$(printf '%s\n' "${missing[@]}")"
+            echo '::error::Missing required files:'
+            printf '%s\n' "${missing[@]}"
             exit 1
           fi
-          echo "All required files are present."
+          echo 'All required files are present.'
 
       - name: Validate local references
         shell: bash
@@ -97,8 +86,7 @@ jobs:
               for ref in pattern.findall(text):
                   if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '#', '/')):
                       continue
-                  target = (path.parent / ref).resolve()
-                  if not target.exists():
+                  if not (path.parent / ref).resolve().exists():
                       missing.append(f'{path}: {ref}')
 
           if missing:
@@ -119,10 +107,10 @@ jobs:
           from pathlib import Path
           import sys
 
-          class DocumentContract(HTMLParser):
+          class Contract(HTMLParser):
               def __init__(self):
                   super().__init__()
-                  self.html_lang = None
+                  self.lang = None
                   self.title = False
                   self.viewport = False
                   self.main = 0
@@ -130,7 +118,7 @@ jobs:
               def handle_starttag(self, tag, attrs):
                   attrs = dict(attrs)
                   if tag == 'html':
-                      self.html_lang = attrs.get('lang')
+                      self.lang = attrs.get('lang')
                   elif tag == 'title':
                       self.title = True
                   elif tag == 'meta' and attrs.get('name', '').lower() == 'viewport':
@@ -141,15 +129,15 @@ jobs:
           failures = []
           pages = sorted(Path('.').glob('*.html'))
           for path in pages:
-              parser = DocumentContract()
+              parser = Contract()
               parser.feed(path.read_text(encoding='utf-8'))
-              if not parser.html_lang:
-                  failures.append(f'{path}: missing <html lang="...">')
+              if not parser.lang:
+                  failures.append(f'{path}: missing <html lang>')
               if not parser.title:
                   failures.append(f'{path}: missing <title>')
               if not parser.viewport:
                   failures.append(f'{path}: missing viewport meta tag')
-              if path.name not in {'404.html'} and parser.main != 1:
+              if path.name != '404.html' and parser.main != 1:
                   failures.append(f'{path}: expected exactly one <main> element')
 
           if failures:
@@ -194,11 +182,8 @@ jobs:
               'Strict-Transport-Security:': 'max-age=31536000; includeSubDomains',
           }
 
-          failures = []
-          for header, value in required.items():
-              if header not in text or value not in text:
-                  failures.append(f'{header} {value}')
-
+          failures = [f'{header} {value}' for header, value in required.items()
+                      if header not in text or value not in text]
           if failures:
               print('Missing or incomplete security headers:')
               print('\n'.join(f'- {item}' for item in failures))
@@ -239,17 +224,11 @@ jobs:
           from pathlib import Path
           import sys
 
-          html = '\n'.join(Path('.').glob('*.html').__iter__().__next__().read_text(encoding='utf-8') for _ in [])
           text = Path('index.html').read_text(encoding='utf-8') + '\n' + Path('downloads.html').read_text(encoding='utf-8')
           required = [
-              'data-release-version',
-              'data-release-name',
-              'data-release-date',
-              'data-release-status',
-              'data-release-url',
-              'data-download="exe"',
-              'data-download="msi"',
-              'data-download="zip"',
+              'data-release-version', 'data-release-name', 'data-release-date',
+              'data-release-status', 'data-release-url',
+              'data-download="exe"', 'data-download="msi"', 'data-download="zip"',
           ]
           failures = [item for item in required if item not in text]
           if failures:
@@ -272,12 +251,13 @@ jobs:
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "$GH_API_URL" > "$response_file"
+
           python - "$response_file" <<'PY'
           import json
           import sys
 
-          path = sys.argv[1]
-          data = json.load(open(path, encoding='utf-8'))
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              data = json.load(handle)
           if not isinstance(data, list):
               raise SystemExit('GitHub Releases API did not return an array.')
           print(f'GitHub Releases API reachable; returned {len(data)} release(s).')
@@ -293,11 +273,11 @@ jobs:
           {
             echo '## VoidOne Website CI'
             echo ''
-            echo '| Gate | Status |'
+            echo '| Gate | Result |'
             echo '| --- | --- |'
             echo '| Required structure | checked |'
             echo '| Local references | checked |'
-            echo '| HTML document contract | checked |'
+            echo '| HTML contract | checked |'
             echo '| JavaScript syntax | checked |'
             echo '| JSON data | checked |'
             echo '| Cloudflare security headers | checked |'
