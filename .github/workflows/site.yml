@@ -11,45 +11,193 @@ permissions:
   contents: read
 
 concurrency:
-  group: website-${{ github.ref }}
+  group: website-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.x'
 
 jobs:
   validate:
+    name: Validate website
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
       - name: Validate required structure
         shell: bash
         run: |
           set -euo pipefail
-          required=(index.html 404.html _headers css/variables.css css/main.css css/responsive.css js/main.js js/github-api.js js/evolution.js data/evolution.json assets/icons/favicon.svg downloads.html developers.html about.html faq.html)
+          required=(
+            index.html
+            404.html
+            downloads.html
+            developers.html
+            about.html
+            faq.html
+            _headers
+            css/variables.css
+            css/main.css
+            css/responsive.css
+            js/main.js
+            js/github-api.js
+            js/evolution.js
+            data/evolution.json
+            assets/icons/favicon.svg
+          )
+
           for file in "${required[@]}"; do
-            test -f "$file" || { echo "Missing required file: $file"; exit 1; }
+            if [[ ! -f "$file" ]]; then
+              echo "::error file=$file::Missing required file: $file"
+              exit 1
+            fi
           done
+          echo "All required files are present."
 
       - name: Validate local references
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib, re, sys
+          import pathlib
+          import re
+          import sys
+
           root = pathlib.Path('.')
-          files = list(root.glob('*.html'))
+          html_files = sorted(root.glob('*.html'))
           missing = []
-          for path in files:
+          pattern = re.compile(r'(?:href|src)=["\']([^"\'#?]+)')
+
+          for path in html_files:
               text = path.read_text(encoding='utf-8')
-              for ref in re.findall(r'(?:href|src)=["\']([^"\'#?]+)', text):
-                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '/')):
+              for ref in pattern.findall(text):
+                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '#', '/')):
                       continue
                   target = (path.parent / ref).resolve()
                   if not target.exists():
                       missing.append(f'{path}: {ref}')
+
           if missing:
-              print('Broken local references:')
+              print('::group::Broken local references')
               print('\n'.join(missing))
+              print('::endgroup::')
               sys.exit(1)
-          print('Local references OK')
+
+          print(f'Validated local references in {len(html_files)} HTML pages.')
           PY
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v node >/dev/null || { echo '::error::Node.js is required for JS syntax validation'; exit 1; }
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done < <(find js -type f -name '*.js' -print0 | sort -z)
+
+      - name: Validate JSON data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool data/evolution.json >/dev/null
+          echo 'evolution.json is valid JSON.'
+
+      - name: Validate Cloudflare headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path('_headers').read_text(encoding='utf-8')
+          required = [
+              'X-Content-Type-Options:',
+              'Referrer-Policy:',
+              'Permissions-Policy:',
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              print('Missing security headers:', ', '.join(missing))
+              sys.exit(1)
+          print('Cloudflare security headers are present.')
+          PY
+
+      - name: Validate GitHub release API contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          text = Path('js/github-api.js').read_text(encoding='utf-8')
+          checks = {
+              'VoidOne repository': 'VoidOne-App/VoidOne',
+              'GitHub releases endpoint': 'releases?per_page=',
+              'prerelease support': '!release.draft',
+              'asset URL support': 'browser_download_url',
+              'release fallback': 'releases',
+          }
+          missing = [name for name, needle in checks.items() if needle not in text]
+          if missing:
+              print('GitHub release integration contract failed:')
+              print('\n'.join(f'- {item}' for item in missing))
+              sys.exit(1)
+          print('GitHub release integration contract is valid.')
+          PY
+
+      - name: Validate release asset selectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path('js/github-api.js').read_text(encoding='utf-8')
+          required = [
+              '[data-release-version]',
+              '[data-release-name]',
+              '[data-release-date]',
+              '[data-release-status]',
+              '[data-release-url]',
+              '[data-download="exe"]',
+              '[data-download="msi"]',
+              '[data-download="zip"]',
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              print('Missing release UI selectors:')
+              print('\n'.join(f'- {item}' for item in missing))
+              sys.exit(1)
+          print('Release UI selectors are wired.')
+          PY
+
+      - name: CI summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Website CI'
+            echo ''
+            echo '- Structure: validated'
+            echo '- Local references: validated'
+            echo '- JavaScript syntax: validated'
+            echo '- JSON data: validated'
+            echo '- Cloudflare headers: validated'
+            echo '- GitHub release integration: validated'
+          } >> "$GITHUB_STEP_SUMMARY"
