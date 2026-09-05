@@ -1,0 +1,55 @@
+name: Website CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(index.html 404.html _headers css/variables.css css/main.css css/responsive.css js/main.js js/github-api.js js/evolution.js data/evolution.json assets/icons/favicon.svg downloads.html developers.html about.html faq.html)
+          for file in "${required[@]}"; do
+            test -f "$file" || { echo "Missing required file: $file"; exit 1; }
+          done
+
+      - name: Validate local references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path('.')
+          files = list(root.glob('*.html'))
+          missing = []
+          for path in files:
+              text = path.read_text(encoding='utf-8')
+              for ref in re.findall(r'(?:href|src)=["\']([^"\'#?]+)', text):
+                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '/')):
+                      continue
+                  target = (path.parent / ref).resolve()
+                  if not target.exists():
+                      missing.append(f'{path}: {ref}')
+          if missing:
+              print('Broken local references:')
+              print('\n'.join(missing))
+              sys.exit(1)
+          print('Local references OK')
+          PY
