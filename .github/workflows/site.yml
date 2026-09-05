@@ -11,45 +11,276 @@ permissions:
   contents: read
 
 concurrency:
-  group: website-${{ github.ref }}
+  group: website-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.x'
+  VOIDONE_REPO: 'VoidOne-App/VoidOne'
 
 jobs:
   validate:
+    name: Validate website
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Validate required structure
         shell: bash
         run: |
           set -euo pipefail
-          required=(index.html 404.html _headers css/variables.css css/main.css css/responsive.css js/main.js js/github-api.js js/evolution.js data/evolution.json assets/icons/favicon.svg downloads.html developers.html about.html faq.html)
+          required=(
+            index.html 404.html downloads.html developers.html about.html faq.html
+            _headers
+            css/variables.css css/main.css css/responsive.css
+            js/main.js js/github-api.js js/evolution.js
+            data/evolution.json assets/icons/favicon.svg
+          )
+
+          missing=()
           for file in "${required[@]}"; do
-            test -f "$file" || { echo "Missing required file: $file"; exit 1; }
+            [[ -f "$file" ]] || missing+=("$file")
           done
+
+          if (( ${#missing[@]} )); then
+            echo '::error::Missing required files:'
+            printf '%s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo 'All required files are present.'
 
       - name: Validate local references
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib, re, sys
+          import pathlib
+          import re
+          import sys
+
           root = pathlib.Path('.')
-          files = list(root.glob('*.html'))
+          html_files = sorted(root.glob('*.html'))
           missing = []
-          for path in files:
+          pattern = re.compile(r'(?:href|src)=["\']([^"\'#?]+)')
+
+          for path in html_files:
               text = path.read_text(encoding='utf-8')
-              for ref in re.findall(r'(?:href|src)=["\']([^"\'#?]+)', text):
-                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '/')):
+              for ref in pattern.findall(text):
+                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '#', '/')):
                       continue
-                  target = (path.parent / ref).resolve()
-                  if not target.exists():
+                  if not (path.parent / ref).resolve().exists():
                       missing.append(f'{path}: {ref}')
+
           if missing:
-              print('Broken local references:')
+              print('::group::Broken local references')
               print('\n'.join(missing))
+              print('::endgroup::')
               sys.exit(1)
-          print('Local references OK')
+
+          print(f'Validated local references in {len(html_files)} HTML pages.')
           PY
+
+      - name: Validate HTML document contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import sys
+
+          class Contract(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.lang = None
+                  self.title = False
+                  self.viewport = False
+                  self.main = 0
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == 'html':
+                      self.lang = attrs.get('lang')
+                  elif tag == 'title':
+                      self.title = True
+                  elif tag == 'meta' and attrs.get('name', '').lower() == 'viewport':
+                      self.viewport = True
+                  elif tag == 'main':
+                      self.main += 1
+
+          failures = []
+          pages = sorted(Path('.').glob('*.html'))
+          for path in pages:
+              parser = Contract()
+              parser.feed(path.read_text(encoding='utf-8'))
+              if not parser.lang:
+                  failures.append(f'{path}: missing <html lang>')
+              if not parser.title:
+                  failures.append(f'{path}: missing <title>')
+              if not parser.viewport:
+                  failures.append(f'{path}: missing viewport meta tag')
+              if path.name != '404.html' and parser.main != 1:
+                  failures.append(f'{path}: expected exactly one <main> element')
+
+          if failures:
+              print('HTML document contract failed:')
+              print('\n'.join(f'- {item}' for item in failures))
+              sys.exit(1)
+          print(f'HTML document contract passed for {len(pages)} pages.')
+          PY
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done < <(find js -type f -name '*.js' -print0 | sort -z)
+          echo 'All JavaScript files passed syntax validation.'
+
+      - name: Validate JSON data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool data/evolution.json >/dev/null
+          echo 'evolution.json is valid JSON.'
+
+      - name: Validate Cloudflare security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path('_headers').read_text(encoding='utf-8')
+          required = {
+              'X-Content-Type-Options:': 'nosniff',
+              'Referrer-Policy:': 'strict-origin-when-cross-origin',
+              'Permissions-Policy:': 'camera=(), microphone=(), geolocation=()',
+              'Cross-Origin-Opener-Policy:': 'same-origin',
+              'Cross-Origin-Resource-Policy:': 'same-origin',
+              'Strict-Transport-Security:': 'max-age=31536000; includeSubDomains',
+          }
+
+          failures = [f'{header} {value}' for header, value in required.items()
+                      if header not in text or value not in text]
+          if failures:
+              print('Missing or incomplete security headers:')
+              print('\n'.join(f'- {item}' for item in failures))
+              sys.exit(1)
+          print('Cloudflare security headers are present and configured.')
+          PY
+
+      - name: Validate GitHub release integration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path('js/github-api.js').read_text(encoding='utf-8')
+          checks = {
+              'VoidOne repository': 'VoidOne-App/VoidOne',
+              'release listing endpoint': 'releases?per_page=',
+              'draft filtering': '!release.draft',
+              'release asset URLs': 'browser_download_url',
+              'release fallback': 'releases',
+              'latest release renderer': 'renderRelease',
+          }
+          failures = [name for name, needle in checks.items() if needle not in text]
+          if failures:
+              print('GitHub release integration contract failed:')
+              print('\n'.join(f'- {item}' for item in failures))
+              sys.exit(1)
+          print('GitHub release integration contract is valid.')
+          PY
+
+      - name: Validate release UI contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path('index.html').read_text(encoding='utf-8') + '\n' + Path('downloads.html').read_text(encoding='utf-8')
+          required = [
+              'data-release-version', 'data-release-name', 'data-release-date',
+              'data-release-status', 'data-release-url',
+              'data-download="exe"', 'data-download="msi"', 'data-download="zip"',
+          ]
+          failures = [item for item in required if item not in text]
+          if failures:
+              print('Missing release UI hooks:')
+              print('\n'.join(f'- {item}' for item in failures))
+              sys.exit(1)
+          print('Release UI contract is valid.')
+          PY
+
+      - name: Smoke test GitHub Releases API
+        shell: bash
+        env:
+          GH_API_URL: https://api.github.com/repos/${{ env.VOIDONE_REPO }}/releases?per_page=1
+        run: |
+          set -euo pipefail
+          response_file="${RUNNER_TEMP}/github-releases.json"
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "$GH_API_URL" > "$response_file"
+
+          python - "$response_file" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              data = json.load(handle)
+          if not isinstance(data, list):
+              raise SystemExit('GitHub Releases API did not return an array.')
+          print(f'GitHub Releases API reachable; returned {len(data)} release(s).')
+          if data:
+              release = data[0]
+              print(f"Latest API result: {release.get('tag_name', 'unknown')} ({release.get('name', 'unnamed')})")
+          PY
+
+      - name: CI summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## VoidOne Website CI'
+            echo ''
+            echo '| Gate | Result |'
+            echo '| --- | --- |'
+            echo '| Required structure | checked |'
+            echo '| Local references | checked |'
+            echo '| HTML contract | checked |'
+            echo '| JavaScript syntax | checked |'
+            echo '| JSON data | checked |'
+            echo '| Cloudflare security headers | checked |'
+            echo '| GitHub release integration | checked |'
+            echo '| Release UI contract | checked |'
+            echo '| GitHub Releases API smoke test | checked |'
+          } >> "$GITHUB_STEP_SUMMARY"
