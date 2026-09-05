@@ -18,6 +18,7 @@ env:
   NODE_VERSION: '22'
   PYTHON_VERSION: '3.x'
   VOIDONE_REPO: 'VoidOne-App/VoidOne'
+  SITE_DIR: 'site'
 
 jobs:
   validate:
@@ -42,16 +43,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Validate required structure
+      - name: Validate static site structure
         shell: bash
         run: |
           set -euo pipefail
           required=(
-            index.html 404.html downloads.html developers.html about.html faq.html
-            _headers
-            css/variables.css css/main.css css/responsive.css
-            js/main.js js/github-api.js js/evolution.js
-            data/evolution.json assets/icons/favicon.svg
+            site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
+            site/_headers
+            site/css/variables.css site/css/main.css site/css/responsive.css
+            site/js/main.js site/js/github-api.js site/js/evolution.js
+            site/data/evolution.json site/assets/icons/favicon.svg
+            wrangler.jsonc
           )
 
           missing=()
@@ -64,7 +66,30 @@ jobs:
             printf '%s\n' "${missing[@]}"
             exit 1
           fi
-          echo 'All required files are present.'
+          echo 'All required static-site files are present.'
+
+      - name: Validate Cloudflare asset boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          config = json.loads(Path('wrangler.jsonc').read_text(encoding='utf-8'))
+          directory = config.get('assets', {}).get('directory')
+          if directory != './site':
+              print(f'::error::Expected Wrangler assets.directory to be ./site, got {directory!r}')
+              sys.exit(1)
+          if not config.get('workers_dev', False):
+              print('::error::workers_dev must remain enabled for the free workers.dev deployment.')
+              sys.exit(1)
+          if config.get('preview_urls') is not False:
+              print('::error::preview_urls must be explicitly disabled for deterministic deployments.')
+              sys.exit(1)
+          print('Cloudflare asset boundary is locked to ./site.')
+          PY
 
       - name: Validate local references
         shell: bash
@@ -75,7 +100,7 @@ jobs:
           import re
           import sys
 
-          root = pathlib.Path('.')
+          root = pathlib.Path('site')
           html_files = sorted(root.glob('*.html'))
           missing = []
           pattern = re.compile(r'(?:href|src)=["\']([^"\'#?]+)')
@@ -126,7 +151,7 @@ jobs:
                       self.main += 1
 
           failures = []
-          pages = sorted(Path('.').glob('*.html'))
+          pages = sorted(Path('site').glob('*.html'))
           for path in pages:
               parser = Contract()
               parser.feed(path.read_text(encoding='utf-8'))
@@ -153,14 +178,14 @@ jobs:
           while IFS= read -r -d '' file; do
             echo "Checking $file"
             node --check "$file"
-          done < <(find js -type f -name '*.js' -print0 | sort -z)
+          done < <(find "$SITE_DIR/js" -type f -name '*.js' -print0 | sort -z)
           echo 'All JavaScript files passed syntax validation.'
 
       - name: Validate JSON data
         shell: bash
         run: |
           set -euo pipefail
-          python -m json.tool data/evolution.json >/dev/null
+          python -m json.tool "$SITE_DIR/data/evolution.json" >/dev/null
           echo 'evolution.json is valid JSON.'
 
       - name: Validate Cloudflare security headers
@@ -171,7 +196,7 @@ jobs:
           from pathlib import Path
           import sys
 
-          text = Path('_headers').read_text(encoding='utf-8')
+          text = Path('site/_headers').read_text(encoding='utf-8')
           required = {
               'X-Content-Type-Options:': 'nosniff',
               'Referrer-Policy:': 'strict-origin-when-cross-origin',
@@ -198,7 +223,7 @@ jobs:
           from pathlib import Path
           import sys
 
-          text = Path('js/github-api.js').read_text(encoding='utf-8')
+          text = Path('site/js/github-api.js').read_text(encoding='utf-8')
           checks = {
               'VoidOne repository': 'VoidOne-App/VoidOne',
               'release listing endpoint': 'releases?per_page=',
@@ -223,7 +248,7 @@ jobs:
           from pathlib import Path
           import sys
 
-          text = Path('index.html').read_text(encoding='utf-8') + '\n' + Path('downloads.html').read_text(encoding='utf-8')
+          text = Path('site/index.html').read_text(encoding='utf-8') + '\n' + Path('site/downloads.html').read_text(encoding='utf-8')
           required = [
               'data-release-version', 'data-release-name', 'data-release-date',
               'data-release-status', 'data-release-url',
@@ -274,7 +299,8 @@ jobs:
             echo ''
             echo '| Gate | Result |'
             echo '| --- | --- |'
-            echo '| Required structure | checked |'
+            echo '| Static site structure | checked |'
+            echo '| Cloudflare asset boundary | checked |'
             echo '| Local references | checked |'
             echo '| HTML contract | checked |'
             echo '| JavaScript syntax | checked |'
