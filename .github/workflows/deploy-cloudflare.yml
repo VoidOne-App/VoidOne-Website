@@ -29,9 +29,33 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Deploy static site
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+      - name: Validate static site boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f wrangler.jsonc
+          test -f site/index.html
+          test -f site/404.html
+          test -f site/_headers
+          test -d site/assets
+          test -d site/css
+          test -d site/js
+          test -d site/data
+
+      - name: Verify Wrangler configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '"name": "voidone-website"' wrangler.jsonc
+          grep -q '"directory": "./site"' wrangler.jsonc
+          grep -q '"compatibility_date": "2026-09-05"' wrangler.jsonc
+
+      - name: Deploy static site with pinned Wrangler
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=wrangler@4.129.0 -- \
+            wrangler deploy --config ./wrangler.jsonc
