@@ -1,22 +1,58 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="VoidOne — an open-source native PC gaming platform built around your games, not around a store.">
-<meta name="theme-color" content="#05070a"><meta property="og:title" content="VoidOne — Open-Source PC Gaming Platform"><meta property="og:description" content="Your games. Your hardware. Your AI. Your rules."><meta property="og:type" content="website">
+<meta name="theme-color" content="#05070a">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="VoidOne — Open-Source PC Gaming Platform">
+<meta property="og:description" content="Your games. Your hardware. Your rules.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VoidOne">
 <title>VoidOne — Open-Source PC Gaming Platform</title>
-<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="css/variables.css"><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/responsive.css">
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
-<header class="nav shell"><a class="brand" href="#top" aria-label="VoidOne home"><span class="brand-mark">V</span>VOIDONE</a><nav class="nav-links" aria-label="Primary navigation"><a href="#platform">Platform</a><a href="#features">Features</a><a href="#evolution">Evolution</a><a href="downloads.html">Download</a><a href="#developers">Developers</a></nav><a class="button ghost" href="https://github.com/VoidOne-App/VoidOne">Source ↗</a></header>
+<a class="skip-link" href="#top">Skip to content</a>
+<header class="nav shell" data-nav>
+  <a class="brand" href="#top" aria-label="VoidOne home"><span class="brand-mark">V</span><span>VOIDONE</span></a>
+  <nav class="nav-links" aria-label="Primary navigation">
+    <a href="#platform">Platform</a><a href="#features">Features</a><a href="#evolution">Evolution</a><a href="downloads.html">Download</a><a href="#developers">Developers</a>
+  </nav>
+  <div class="nav-actions"><a class="button ghost nav-source" href="https://github.com/VoidOne-App/VoidOne">Source <span aria-hidden="true">↗</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open navigation"><span></span><span></span><span></span></button></div>
+  <nav id="mobile-menu" class="mobile-menu" aria-label="Mobile navigation" hidden>
+    <a href="#platform">Platform</a><a href="#features">Features</a><a href="#evolution">Evolution</a><a href="downloads.html">Download</a><a href="#developers">Developers</a><a href="https://github.com/VoidOne-App/VoidOne">Source ↗</a>
+  </nav>
+</header>
 <main id="top">
-<section class="hero shell"><p class="eyebrow">OPEN SOURCE · NATIVE PC GAMING</p><h1>Your games.<br><span class="outline">Your hardware.</span><br>Your rules.</h1><p class="hero-copy">VoidOne is an open-source native PC gaming platform built around games, not a store.</p><div class="actions"><a class="button" data-release-url href="https://github.com/VoidOne-App/VoidOne/releases">Download <span data-latest-release>latest release</span> ↗</a><a class="button ghost" href="https://github.com/VoidOne-App/VoidOne">Explore source ↗</a></div>
-<div class="release-strip" data-release-panel data-loading><span class="release-dot"></span><div><b data-release-version>CHECKING LATEST RELEASE…</b><span><span data-release-status>LOADING</span> · <span data-release-date>Checking GitHub…</span></span></div><a data-release-url href="https://github.com/VoidOne-App/VoidOne/releases">Release details ↗</a></div>
-<div class="status-row"><article><b>OPEN SOURCE</b><span>Built in public</span></article><article><b>LOCAL-FIRST</b><span>Local control by design</span></article><article><b>NO ADS</b><span>Focused on your library</span></article><article><b>NO TELEMETRY</b><span>Privacy by design</span></article></div></section>
-<section id="platform" class="section shell"><div class="section-head"><p class="eyebrow">THE PLATFORM</p><h2>Native at the core.</h2><p>VoidOne is built as a native desktop platform with a C++23 foundation, Qt 6.11.2, QML/Qt Quick, SQLite and a Windows-first CI/CD pipeline.</p></div><div class="architecture"><div class="arch-card"><span class="index">01</span><h3>QML / Qt Quick</h3><p>Native desktop interface</p></div><div class="arch-line"></div><div class="arch-card core"><span class="index">02</span><h3>C++ CORE</h3><p>Application and systems layer</p></div><div class="arch-line"></div><div class="arch-card"><span class="index">03</span><h3>LOCAL DATA</h3><p>SQLite-backed persistence</p></div></div><div class="stack"><span>C++23</span><span>Qt 6.11.2</span><span>QML</span><span>SQLite</span><span>CMake</span><span>Ninja</span><span>CTest</span><span>MSVC x64</span></div></section>
-<section id="features" class="section alt"><div class="shell"><div class="section-head"><p class="eyebrow">CURRENT IMPLEMENTATION</p><h2>Built from the code up.</h2><p>VoidOne separates what exists today from experimental work and the longer-term roadmap.</p></div><div class="feature-grid"><article class="feature"><span class="index">01</span><h3>Game Library</h3><p>Library-oriented models and desktop UI for managing games already on the player's machine.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">02</span><h3>Steam Discovery</h3><p>Steam library discovery and executable-path handling on the primary Windows platform.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">03</span><h3>Save Backups</h3><p>Local save-backup management exposed through the application.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">04</span><h3>Diagnostics</h3><p>Logging and diagnostic tooling to make troubleshooting more practical.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">05</span><h3>Localization</h3><p>Translation infrastructure with RTL/LTR-aware interface support.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">06</span><h3>Release Engineering</h3><p>Automated tests, Qt deployment, Windows packaging and portable release artifacts.</p><small>IN DEVELOPMENT</small></article></div></div></section>
-<section id="evolution" class="section shell"><div class="section-head"><p class="eyebrow">PROJECT EVOLUTION</p><h2>Built in the open.</h2><p>Milestones are loaded from the site's versioned evolution dataset; the repository remains the source of truth.</p></div><div id="evolution-list" class="timeline"><article class="timeline-item"><time>LOADING</time><div><h3>Reading project history…</h3><p>Loading the evolution dataset.</p></div></article></div></section>
-<section id="developers" class="section alt"><div class="shell dev-grid"><div class="section-head"><p class="eyebrow">FOR DEVELOPERS</p><h2>Open the hood.</h2><p>Build it, inspect it, improve it. Source, build instructions, security guidance and contribution paths stay public.</p></div><div class="link-list"><a href="developers.html"><b>Developer Hub</b><span>Build, architecture and CI/CD →</span></a><a href="https://github.com/VoidOne-App/VoidOne/blob/main/BUILD.md"><b>Build</b><span>Get the project running locally →</span></a><a href="https://github.com/VoidOne-App/VoidOne/security"><b>Security</b><span>Security policy and advisories →</span></a><a href="https://github.com/VoidOne-App/VoidOne/issues"><b>Contribute</b><span>Issues and improvements →</span></a></div></div></section>
-</main><footer class="footer shell"><div><strong>VOIDONE</strong><div>Built in the open. Evolving in the open.</div></div><div><a href="downloads.html">Download</a> · <a href="about.html">About</a> · <a href="faq.html">FAQ</a> · <a href="https://github.com/VoidOne-App/VoidOne">Source ↗</a></div></footer>
+<section class="hero shell reveal">
+  <div class="hero-kicker"><span class="live-dot" aria-hidden="true"></span>OPEN SOURCE · NATIVE PC GAMING</div>
+  <h1>Your games.<br><span class="outline">Your hardware.</span><br>Your rules.</h1>
+  <p class="hero-copy">VoidOne is an open-source native PC gaming platform built around games, not a store.</p>
+  <div class="actions">
+    <a class="button button-large" data-release-url href="https://github.com/VoidOne-App/VoidOne/releases">Download <span data-latest-release>latest release</span> <span aria-hidden="true">↗</span></a>
+    <a class="button ghost button-large" href="https://github.com/VoidOne-App/VoidOne">Explore source <span aria-hidden="true">↗</span></a>
+  </div>
+  <div class="release-strip" data-release-panel data-loading>
+    <span class="release-dot" aria-hidden="true"></span><div><b data-release-version>CHECKING LATEST RELEASE…</b><span><span data-release-status>LOADING</span> · <span data-release-date>Checking GitHub…</span></span></div><a data-release-url href="https://github.com/VoidOne-App/VoidOne/releases">Release details <span aria-hidden="true">↗</span></a>
+  </div>
+  <div class="status-row" aria-label="Project principles">
+    <article><b>OPEN SOURCE</b><span>Built in public</span></article><article><b>LOCAL-FIRST</b><span>Local control by design</span></article><article><b>NO ADS</b><span>Focused on your library</span></article><article><b>NO TELEMETRY</b><span>Privacy by design</span></article>
+  </div>
+</section>
+<section id="platform" class="section shell reveal">
+  <div class="section-head"><p class="eyebrow">THE PLATFORM</p><h2>Native at the core.</h2><p>VoidOne is built as a native desktop platform with a C++23 foundation, Qt 6.11.2, QML/Qt Quick, SQLite and a Windows-first CI/CD pipeline.</p></div>
+  <div class="architecture"><div class="arch-card"><span class="index">01</span><h3>QML / Qt Quick</h3><p>Native desktop interface</p></div><div class="arch-line" aria-hidden="true"></div><div class="arch-card core"><span class="index">02</span><h3>C++ CORE</h3><p>Application and systems layer</p></div><div class="arch-line" aria-hidden="true"></div><div class="arch-card"><span class="index">03</span><h3>LOCAL DATA</h3><p>SQLite-backed persistence</p></div></div>
+  <div class="stack" aria-label="Technology stack"><span>C++23</span><span>Qt 6.11.2</span><span>QML</span><span>SQLite</span><span>CMake</span><span>Ninja</span><span>CTest</span><span>MSVC x64</span></div>
+</section>
+<section id="features" class="section alt reveal"><div class="shell"><div class="section-head"><p class="eyebrow">CURRENT IMPLEMENTATION</p><h2>Built from the code up.</h2><p>VoidOne separates what exists today from experimental work and the longer-term roadmap.</p></div><div class="feature-grid"><article class="feature"><span class="index">01</span><h3>Game Library</h3><p>Library-oriented models and desktop UI for managing games already on the player's machine.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">02</span><h3>Steam Discovery</h3><p>Steam library discovery and executable-path handling on the primary Windows platform.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">03</span><h3>Save Backups</h3><p>Local save-backup management exposed through the application.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">04</span><h3>Diagnostics</h3><p>Logging and diagnostic tooling to make troubleshooting more practical.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">05</span><h3>Localization</h3><p>Translation infrastructure with RTL/LTR-aware interface support.</p><small>IMPLEMENTED</small></article><article class="feature"><span class="index">06</span><h3>Release Engineering</h3><p>Automated tests, Qt deployment, Windows packaging and portable release artifacts.</p><small>IN DEVELOPMENT</small></article></div></div></section>
+<section id="evolution" class="section shell reveal"><div class="section-head"><p class="eyebrow">PROJECT EVOLUTION</p><h2>Built in the open.</h2><p>Milestones are loaded from the site's versioned evolution dataset; the repository remains the source of truth.</p></div><div id="evolution-list" class="timeline"><article class="timeline-item"><time>LOADING</time><div><h3>Reading project history…</h3><p>Loading the evolution dataset.</p></div></article></div></section>
+<section id="developers" class="section alt reveal"><div class="shell dev-grid"><div class="section-head"><p class="eyebrow">FOR DEVELOPERS</p><h2>Open the hood.</h2><p>Build it, inspect it, improve it. Source, build instructions, security guidance and contribution paths stay public.</p></div><div class="link-list"><a href="developers.html"><b>Developer Hub</b><span>Build, architecture and CI/CD →</span></a><a href="https://github.com/VoidOne-App/VoidOne/blob/main/BUILD.md"><b>Build</b><span>Get the project running locally →</span></a><a href="https://github.com/VoidOne-App/VoidOne/security"><b>Security</b><span>Security policy and advisories →</span></a><a href="https://github.com/VoidOne-App/VoidOne/issues"><b>Contribute</b><span>Issues and improvements →</span></a></div></div></section>
+</main>
+<footer class="footer shell"><div><strong>VOIDONE</strong><div>Built in the open. Evolving in the open.</div></div><div><a href="downloads.html">Download</a> · <a href="about.html">About</a> · <a href="faq.html">FAQ</a> · <a href="https://github.com/VoidOne-App/VoidOne">Source ↗</a></div></footer>
 <script src="js/main.js" defer></script><script src="js/github-api.js" defer></script><script src="js/evolution.js" defer></script>
 </body></html>
