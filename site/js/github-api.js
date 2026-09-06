@@ -24,22 +24,31 @@ function findAsset(release, extensions) {
 
 function formatDate(value) {
   if (!value) return 'Date unavailable';
-  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 function setText(selector, value) {
   document.querySelectorAll(selector).forEach((node) => { node.textContent = value; });
 }
 
-function renderAsset(key, extensions, releaseUrl) {
-  const asset = findAsset(releaseUrl, extensions);
+function renderAsset(key, extensions, release) {
+  const asset = findAsset(release, extensions);
+  const targetUrl = asset?.browser_download_url || release?.html_url || FALLBACK_RELEASES;
+
   document.querySelectorAll(`[data-download="${key}"]`).forEach((node) => {
-    node.href = asset?.browser_download_url || releaseUrl.html_url || FALLBACK_RELEASES;
+    node.href = targetUrl;
     node.setAttribute('aria-disabled', asset ? 'false' : 'true');
+    node.setAttribute('title', asset ? `Download ${asset.name}` : 'Asset not included; open the release page');
   });
   document.querySelectorAll(`[data-asset="${key}"]`).forEach((node) => {
     node.textContent = asset ? asset.name : 'Not included in this release';
   });
+}
+
+function clearReleaseLoadingState() {
+  document.querySelectorAll('[data-release-panel]').forEach((node) => node.removeAttribute('data-loading'));
 }
 
 async function renderRelease() {
@@ -61,8 +70,6 @@ async function renderRelease() {
     renderAsset('exe', ['.exe'], release);
     renderAsset('msi', ['.msi'], release);
     renderAsset('zip', ['.zip'], release);
-
-    document.querySelectorAll('[data-release-panel]').forEach((node) => node.removeAttribute('data-loading'));
   } catch (_) {
     setText('[data-release-version]', 'Release unavailable');
     setText('[data-release-name]', 'Open GitHub Releases');
@@ -73,6 +80,13 @@ async function renderRelease() {
       node.href = FALLBACK_RELEASES;
     });
     document.querySelectorAll('[data-asset]').forEach((node) => { node.textContent = 'Open release page'; });
+    document.querySelectorAll('[data-download]').forEach((node) => {
+      node.href = FALLBACK_RELEASES;
+      node.setAttribute('aria-disabled', 'true');
+      node.setAttribute('title', 'Live release data unavailable; open GitHub Releases');
+    });
+  } finally {
+    clearReleaseLoadingState();
   }
 }
 
