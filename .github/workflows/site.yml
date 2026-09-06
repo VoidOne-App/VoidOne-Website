@@ -188,6 +188,12 @@ jobs:
           python -m json.tool "$SITE_DIR/data/evolution.json" >/dev/null
           echo 'evolution.json is valid JSON.'
 
+      - name: Validate release integration stability contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/release-api-contract.js
+
       - name: Validate Cloudflare security headers
         shell: bash
         run: |
@@ -305,6 +311,7 @@ jobs:
             echo '| HTML contract | checked |'
             echo '| JavaScript syntax | checked |'
             echo '| JSON data | checked |'
+            echo '| Release stability contract | checked |'
             echo '| Cloudflare security headers | checked |'
             echo '| GitHub release integration | checked |'
             echo '| Release UI contract | checked |'
