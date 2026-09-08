@@ -50,17 +50,15 @@ jobs:
           required=(
             site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
             site/_headers
+            site/robots.txt site/sitemap.xml
             site/css/variables.css site/css/main.css site/css/responsive.css
             site/js/main.js site/js/github-api.js site/js/evolution.js
             site/data/evolution.json site/assets/icons/favicon.svg
+            tests/release-api-contract.js tests/seo-contract.js tests/site-sync-contract.js
             wrangler.jsonc
           )
-
           missing=()
-          for file in "${required[@]}"; do
-            [[ -f "$file" ]] || missing+=("$file")
-          done
-
+          for file in "${required[@]}"; do [[ -f "$file" ]] || missing+=("$file"); done
           if (( ${#missing[@]} )); then
             echo '::error::Missing required files:'
             printf '%s\n' "${missing[@]}"
@@ -76,18 +74,13 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           config = json.loads(Path('wrangler.jsonc').read_text(encoding='utf-8'))
-          directory = config.get('assets', {}).get('directory')
-          if directory != './site':
-              print(f'::error::Expected Wrangler assets.directory to be ./site, got {directory!r}')
-              sys.exit(1)
+          if config.get('assets', {}).get('directory') != './site':
+              print('::error::Wrangler assets.directory must be ./site'); sys.exit(1)
           if not config.get('workers_dev', False):
-              print('::error::workers_dev must remain enabled for the free workers.dev deployment.')
-              sys.exit(1)
+              print('::error::workers_dev must remain enabled for the current deployment'); sys.exit(1)
           if config.get('preview_urls') is not False:
-              print('::error::preview_urls must be explicitly disabled for deterministic deployments.')
-              sys.exit(1)
+              print('::error::preview_urls must be explicitly disabled'); sys.exit(1)
           print('Cloudflare asset boundary is locked to ./site.')
           PY
 
@@ -96,176 +89,97 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import pathlib
-          import re
-          import sys
-
+          import pathlib, re, sys
           root = pathlib.Path('site')
-          html_files = sorted(root.glob('*.html'))
           missing = []
           pattern = re.compile(r'(?:href|src)=["\']([^"\'#?]+)')
-
-          for path in html_files:
+          for path in sorted(root.glob('*.html')):
               text = path.read_text(encoding='utf-8')
               for ref in pattern.findall(text):
-                  if ref.startswith(('http://', 'https://', 'mailto:', 'data:', '#', '/')):
-                      continue
-                  if not (path.parent / ref).resolve().exists():
-                      missing.append(f'{path}: {ref}')
-
+                  if ref.startswith(('http://','https://','mailto:','data:','#','/')): continue
+                  if not (path.parent / ref).resolve().exists(): missing.append(f'{path}: {ref}')
           if missing:
-              print('::group::Broken local references')
-              print('\n'.join(missing))
-              print('::endgroup::')
-              sys.exit(1)
-
-          print(f'Validated local references in {len(html_files)} HTML pages.')
+              print('\n'.join(missing)); sys.exit(1)
+          print('Local HTML references are valid.')
           PY
 
-      - name: Validate HTML document contract
+      - name: Validate HTML and SEO contract
         shell: bash
         run: |
           set -euo pipefail
+          node tests/seo-contract.js
           python - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
           import sys
-
           class Contract(HTMLParser):
               def __init__(self):
-                  super().__init__()
-                  self.lang = None
-                  self.title = False
-                  self.viewport = False
-                  self.main = 0
-
+                  super().__init__(); self.lang=None; self.title=False; self.viewport=False; self.main=0
               def handle_starttag(self, tag, attrs):
-                  attrs = dict(attrs)
-                  if tag == 'html':
-                      self.lang = attrs.get('lang')
-                  elif tag == 'title':
-                      self.title = True
-                  elif tag == 'meta' and attrs.get('name', '').lower() == 'viewport':
-                      self.viewport = True
-                  elif tag == 'main':
-                      self.main += 1
-
-          failures = []
-          pages = sorted(Path('site').glob('*.html'))
-          for path in pages:
-              parser = Contract()
-              parser.feed(path.read_text(encoding='utf-8'))
-              if not parser.lang:
-                  failures.append(f'{path}: missing <html lang>')
-              if not parser.title:
-                  failures.append(f'{path}: missing <title>')
-              if not parser.viewport:
-                  failures.append(f'{path}: missing viewport meta tag')
-              if path.name != '404.html' and parser.main != 1:
-                  failures.append(f'{path}: expected exactly one <main> element')
-
-          if failures:
-              print('HTML document contract failed:')
-              print('\n'.join(f'- {item}' for item in failures))
-              sys.exit(1)
-          print(f'HTML document contract passed for {len(pages)} pages.')
+                  attrs=dict(attrs)
+                  if tag=='html': self.lang=attrs.get('lang')
+                  elif tag=='title': self.title=True
+                  elif tag=='meta' and attrs.get('name','').lower()=='viewport': self.viewport=True
+                  elif tag=='main': self.main+=1
+          failures=[]
+          for path in sorted(Path('site').glob('*.html')):
+              p=Contract(); p.feed(path.read_text(encoding='utf-8'))
+              if not p.lang: failures.append(f'{path}: missing html lang')
+              if not p.title: failures.append(f'{path}: missing title')
+              if not p.viewport: failures.append(f'{path}: missing viewport')
+              if path.name!='404.html' and p.main!=1: failures.append(f'{path}: expected one main')
+          if failures: print('\n'.join(failures)); sys.exit(1)
+          print('HTML document contract passed.')
           PY
 
       - name: Validate JavaScript syntax
         shell: bash
         run: |
           set -euo pipefail
-          while IFS= read -r -d '' file; do
-            echo "Checking $file"
-            node --check "$file"
-          done < <(find "$SITE_DIR/js" -type f -name '*.js' -print0 | sort -z)
-          echo 'All JavaScript files passed syntax validation.'
+          find "$SITE_DIR/js" -type f -name '*.js' -print0 | sort -z | while IFS= read -r -d '' file; do node --check "$file"; done
 
-      - name: Validate JSON data
+      - name: Validate JSON and security headers
         shell: bash
         run: |
           set -euo pipefail
           python -m json.tool "$SITE_DIR/data/evolution.json" >/dev/null
-          echo 'evolution.json is valid JSON.'
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          text=Path('site/_headers').read_text(encoding='utf-8')
+          required={
+            'X-Content-Type-Options:':'nosniff',
+            'Referrer-Policy:':'strict-origin-when-cross-origin',
+            'Permissions-Policy:':'camera=(), microphone=(), geolocation=()',
+            'Cross-Origin-Opener-Policy:':'same-origin',
+            'Cross-Origin-Resource-Policy:':'same-origin',
+            'Strict-Transport-Security:':'max-age=31536000; includeSubDomains'
+          }
+          failures=[f'{k} {v}' for k,v in required.items() if k not in text or v not in text]
+          if failures: print('\n'.join(failures)); sys.exit(1)
+          print('JSON and security-header validation passed.')
+          PY
 
-      - name: Validate release integration stability contract
+      - name: Validate release integration
         shell: bash
         run: |
           set -euo pipefail
           node tests/release-api-contract.js
+          node tests/site-sync-contract.js
 
-      - name: Validate Cloudflare security headers
+      - name: Validate current release UI
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import sys
-
-          text = Path('site/_headers').read_text(encoding='utf-8')
-          required = {
-              'X-Content-Type-Options:': 'nosniff',
-              'Referrer-Policy:': 'strict-origin-when-cross-origin',
-              'Permissions-Policy:': 'camera=(), microphone=(), geolocation=()',
-              'Cross-Origin-Opener-Policy:': 'same-origin',
-              'Cross-Origin-Resource-Policy:': 'same-origin',
-              'Strict-Transport-Security:': 'max-age=31536000; includeSubDomains',
-          }
-
-          failures = [f'{header} {value}' for header, value in required.items()
-                      if header not in text or value not in text]
-          if failures:
-              print('Missing or incomplete security headers:')
-              print('\n'.join(f'- {item}' for item in failures))
-              sys.exit(1)
-          print('Cloudflare security headers are present and configured.')
-          PY
-
-      - name: Validate GitHub release integration contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import sys
-
-          text = Path('site/js/github-api.js').read_text(encoding='utf-8')
-          checks = {
-              'VoidOne repository': 'VoidOne-App/VoidOne',
-              'release listing endpoint': 'releases?per_page=',
-              'draft filtering': '!release.draft',
-              'release asset URLs': 'browser_download_url',
-              'release fallback': 'releases',
-              'latest release renderer': 'renderRelease',
-          }
-          failures = [name for name, needle in checks.items() if needle not in text]
-          if failures:
-              print('GitHub release integration contract failed:')
-              print('\n'.join(f'- {item}' for item in failures))
-              sys.exit(1)
-          print('GitHub release integration contract is valid.')
-          PY
-
-      - name: Validate release UI contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import sys
-
-          text = Path('site/index.html').read_text(encoding='utf-8') + '\n' + Path('site/downloads.html').read_text(encoding='utf-8')
-          required = [
-              'data-release-version', 'data-release-name', 'data-release-date',
-              'data-release-status', 'data-release-url',
-              'data-download="exe"', 'data-download="msi"', 'data-download="zip"',
-          ]
-          failures = [item for item in required if item not in text]
-          if failures:
-              print('Missing release UI hooks:')
-              print('\n'.join(f'- {item}' for item in failures))
-              sys.exit(1)
-          print('Release UI contract is valid.')
+          text=Path('site/index.html').read_text(encoding='utf-8')+'\n'+Path('site/downloads.html').read_text(encoding='utf-8')
+          required=['data-release-version','data-release-name','data-release-date','data-release-status','data-release-url','data-download="exe"','data-download="zip"']
+          failures=[item for item in required if item not in text]
+          if failures: print('\n'.join(failures)); sys.exit(1)
+          if 'data-download="msi"' in text or 'MSI Package' in text: print('::error::Stale MSI release UI remains'); sys.exit(1)
+          print('Current release UI contract passed.')
           PY
 
       - name: Smoke test GitHub Releases API
@@ -275,45 +189,12 @@ jobs:
         run: |
           set -euo pipefail
           response_file="${RUNNER_TEMP}/github-releases.json"
-          curl --fail --silent --show-error \
-            --retry 3 --retry-delay 2 --retry-all-errors \
-            --connect-timeout 10 --max-time 30 \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "$GH_API_URL" > "$response_file"
-
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 30 \
+            -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GH_API_URL" > "$response_file"
           python - "$response_file" <<'PY'
-          import json
-          import sys
-
-          with open(sys.argv[1], encoding='utf-8') as handle:
-              data = json.load(handle)
-          if not isinstance(data, list):
-              raise SystemExit('GitHub Releases API did not return an array.')
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f: data=json.load(f)
+          if not isinstance(data,list): raise SystemExit('GitHub Releases API did not return an array.')
           print(f'GitHub Releases API reachable; returned {len(data)} release(s).')
-          if data:
-              release = data[0]
-              print(f"Latest API result: {release.get('tag_name', 'unknown')} ({release.get('name', 'unnamed')})")
+          if data: print(f"Latest API result: {data[0].get('tag_name','unknown')}")
           PY
-
-      - name: CI summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo '## VoidOne Website CI'
-            echo ''
-            echo '| Gate | Result |'
-            echo '| --- | --- |'
-            echo '| Static site structure | checked |'
-            echo '| Cloudflare asset boundary | checked |'
-            echo '| Local references | checked |'
-            echo '| HTML contract | checked |'
-            echo '| JavaScript syntax | checked |'
-            echo '| JSON data | checked |'
-            echo '| Release stability contract | checked |'
-            echo '| Cloudflare security headers | checked |'
-            echo '| GitHub release integration | checked |'
-            echo '| Release UI contract | checked |'
-            echo '| GitHub Releases API smoke test | checked |'
-          } >> "$GITHUB_STEP_SUMMARY"
