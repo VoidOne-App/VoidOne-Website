@@ -21,7 +21,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -33,14 +35,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f wrangler.jsonc
-          test -f site/index.html
-          test -f site/404.html
-          test -f site/_headers
-          test -d site/assets
-          test -d site/css
-          test -d site/js
-          test -d site/data
+          required=(
+            wrangler.jsonc
+            site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
+            site/_headers site/robots.txt site/sitemap.xml
+            site/css/variables.css site/css/main.css site/css/responsive.css
+            site/js/main.js site/js/github-api.js site/js/evolution.js
+            site/data/evolution.json site/assets/icons/favicon.svg
+          )
+          for file in "${required[@]}"; do
+            test -f "$file" || { echo "::error::Missing required deployment file: $file"; exit 1; }
+          done
 
       - name: Verify Wrangler configuration
         shell: bash
@@ -49,6 +54,13 @@ jobs:
           grep -q '"name": "voidone-website"' wrangler.jsonc
           grep -q '"directory": "./site"' wrangler.jsonc
           grep -q '"compatibility_date": "2026-09-05"' wrangler.jsonc
+
+      - name: Verify current site sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/site-sync-contract.js
+          node tests/seo-contract.js
 
       - name: Deploy static site with pinned Wrangler
         shell: bash
