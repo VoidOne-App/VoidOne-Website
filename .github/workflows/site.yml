@@ -53,7 +53,7 @@ jobs:
             site/robots.txt site/sitemap.xml
             site/css/variables.css site/css/main.css site/css/responsive.css
             site/js/main.js site/js/github-api.js site/js/evolution.js
-            site/data/evolution.json site/assets/icons/favicon.svg
+            site/data/evolution.json site/assets/icons/favicon.svg site/assets/icons/voidone-mark.svg
             tests/release-api-contract.js tests/seo-contract.js tests/site-sync-contract.js
             wrangler.jsonc
           )
