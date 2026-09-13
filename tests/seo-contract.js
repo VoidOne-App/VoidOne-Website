@@ -1,16 +1,13 @@
 const fs = require('fs');
+const path = require('path');
 
-const pages = [
-  'site/index.html',
-  'site/downloads.html',
-  'site/developers.html',
-  'site/about.html',
-  'site/faq.html'
-];
+const pages = fs.readdirSync('site', { recursive: true }).filter((file) => file.endsWith('.html')).map((file) => path.join('site', file));
 
 for (const file of pages) {
   const source = fs.readFileSync(file, 'utf8');
-  for (const needle of ['<html lang="en">', '<meta name="viewport"', '<meta name="description"', '<title>']) {
+  const isPersian = file.includes(`${path.sep}fa${path.sep}`);
+  const langContract = isPersian ? '<html lang="fa" dir="rtl">' : '<html lang="en">';
+  for (const needle of [langContract, '<meta name="viewport"', '<meta name="description"', '<title>']) {
     if (!source.includes(needle)) throw new Error(`${file}: missing SEO contract ${needle}`);
   }
 }
@@ -24,4 +21,4 @@ for (const file of ['site/robots.txt', 'site/sitemap.xml']) {
   if (!fs.existsSync(file)) throw new Error(`Missing ${file}`);
 }
 
-console.log('SEO contract: OK');
+console.log(`SEO contract: OK (${pages.length} HTML pages)`);
