@@ -68,7 +68,6 @@ async function renderRelease() {
     document.querySelectorAll('[data-release-url]').forEach((node) => { node.href = release.html_url || FALLBACK_RELEASES; });
 
     renderAsset('exe', ['.exe'], release);
-    renderAsset('msi', ['.msi'], release);
     renderAsset('zip', ['.zip'], release);
   } catch (_) {
     setText('[data-release-version]', 'Release unavailable');
