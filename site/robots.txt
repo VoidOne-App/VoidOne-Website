@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://voidone-website.mohamemk47.workers.dev/sitemap.xml
