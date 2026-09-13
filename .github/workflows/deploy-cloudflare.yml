@@ -38,8 +38,9 @@ jobs:
           required=(
             wrangler.jsonc
             site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
+            site/fa/index.html site/fa/404.html site/fa/downloads.html site/fa/developers.html site/fa/about.html site/fa/faq.html
             site/_headers site/robots.txt site/sitemap.xml
-            site/css/variables.css site/css/main.css site/css/responsive.css
+            site/css/variables.css site/css/main.css site/css/responsive.css site/css/rtl.css
             site/js/main.js site/js/github-api.js site/js/evolution.js
             site/data/evolution.json site/assets/icons/favicon.svg site/assets/icons/voidone-mark.svg
           )
