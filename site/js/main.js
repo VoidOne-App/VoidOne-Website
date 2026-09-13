@@ -58,7 +58,7 @@
   languageLink.textContent = isPersian ? 'EN' : 'فا';
   languageLink.setAttribute('aria-label', isPersian ? 'Switch to English' : 'تغییر زبان به فارسی');
   const navActions = document.querySelector('.nav-actions');
-  if (navActions && !navActions.querySelector('.language-link')) navActions.prepend(languageLink);
+  if (navActions && !navActions.querySelector('.language-link') && !(isPersian && navActions.querySelector('[lang="en"]'))) navActions.prepend(languageLink);
 
   if (!reduceMotion) {
     document.documentElement.classList.add('motion-ready');
