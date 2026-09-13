@@ -55,8 +55,8 @@
   languageLink.href = languageTarget;
   languageLink.lang = isPersian ? 'en' : 'fa';
   languageLink.dir = isPersian ? 'ltr' : 'rtl';
-  languageLink.textContent = isPersian ? 'EN' : 'فا';
-  languageLink.setAttribute('aria-label', isPersian ? 'Switch to English' : 'تغییر زبان به فارسی');
+  languageLink.textContent = isPersian ? 'EN' : 'پارسی';
+  languageLink.setAttribute('aria-label', isPersian ? 'Switch to English' : 'تغییر زبان به پارسی');
   const navActions = document.querySelector('.nav-actions');
   if (navActions && !navActions.querySelector('.language-link') && !(isPersian && navActions.querySelector('[lang="en"]'))) navActions.prepend(languageLink);
 
