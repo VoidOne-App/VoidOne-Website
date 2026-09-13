@@ -28,13 +28,13 @@
     const closeMenu = () => {
       mobileMenu.hidden = true;
       menuButton.setAttribute('aria-expanded', 'false');
-      menuButton.setAttribute('aria-label', 'Open navigation');
+      menuButton.setAttribute('aria-label', document.documentElement.dir === 'rtl' ? 'باز کردن ناوبری' : 'Open navigation');
     };
     menuButton.addEventListener('click', () => {
       const open = mobileMenu.hidden;
       mobileMenu.hidden = !open;
       menuButton.setAttribute('aria-expanded', String(open));
-      menuButton.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+      menuButton.setAttribute('aria-label', open ? (document.documentElement.dir === 'rtl' ? 'بستن ناوبری' : 'Close navigation') : (document.documentElement.dir === 'rtl' ? 'باز کردن ناوبری' : 'Open navigation'));
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') closeMenu();
@@ -46,6 +46,19 @@
       if (window.innerWidth > 900) closeMenu();
     });
   }
+
+  const isPersian = document.documentElement.dir === 'rtl' || location.pathname.includes('/fa/');
+  const currentPage = location.pathname.split('/').pop() || 'index.html';
+  const languageTarget = isPersian ? `../${currentPage}` : `fa/${currentPage}`;
+  const languageLink = document.createElement('a');
+  languageLink.className = 'button ghost language-link';
+  languageLink.href = languageTarget;
+  languageLink.lang = isPersian ? 'en' : 'fa';
+  languageLink.dir = isPersian ? 'ltr' : 'rtl';
+  languageLink.textContent = isPersian ? 'EN' : 'فا';
+  languageLink.setAttribute('aria-label', isPersian ? 'Switch to English' : 'تغییر زبان به فارسی');
+  const navActions = document.querySelector('.nav-actions');
+  if (navActions && !navActions.querySelector('.language-link')) navActions.prepend(languageLink);
 
   if (!reduceMotion) {
     document.documentElement.classList.add('motion-ready');
