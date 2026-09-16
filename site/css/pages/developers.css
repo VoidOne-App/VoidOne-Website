@@ -1,0 +1,1 @@
+.dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:55px}.dev-grid a{padding:30px;background:var(--surface);text-decoration:none;min-height:150px}.dev-grid b{display:block;font-size:18px}.dev-grid span{display:block;color:var(--muted);margin-top:10px}@media(max-width:650px){.dev-grid{grid-template-columns:1fr}}
