@@ -1,100 +1,14 @@
 /* VoidOne Persian / RTL presentation */
-html[dir="rtl"] {
-  font-family: "Vazirmatn", "Segoe UI", Tahoma, Arial, sans-serif;
-  text-rendering: optimizeLegibility;
-}
-
-html[dir="rtl"] body {
-  letter-spacing: 0;
-}
-
-html[dir="rtl"] .hero,
-html[dir="rtl"] .section-head,
-html[dir="rtl"] .feature,
-html[dir="rtl"] .arch-card,
-html[dir="rtl"] .release-panel,
-html[dir="rtl"] .footer,
-html[dir="rtl"] .faq {
-  text-align: right;
-}
-
-html[dir="rtl"] .hero-kicker,
-html[dir="rtl"] .actions,
-html[dir="rtl"] .stack,
-html[dir="rtl"] .nav-actions,
-html[dir="rtl"] .release-meta {
-  direction: rtl;
-}
-
-html[dir="rtl"] .outline {
-  direction: rtl;
-}
-
-html[dir="rtl"] .feature-grid,
-html[dir="rtl"] .architecture,
-html[dir="rtl"] .dev-grid {
-  direction: rtl;
-}
-
-html[dir="rtl"] .index {
-  direction: ltr;
-  display: inline-block;
-  letter-spacing: .04em;
-}
-
-html[dir="rtl"] .timeline-item {
-  grid-template-columns: 140px 1fr;
-}
-
-html[dir="rtl"] .timeline-item time {
-  direction: rtl;
-}
-
-html[dir="rtl"] .link-list a,
-html[dir="rtl"] .status-row article {
-  text-align: right;
-}
-
-html[dir="rtl"] .link-list a span,
-html[dir="rtl"] .release-strip,
-html[dir="rtl"] .release-panel {
-  direction: rtl;
-}
-
-html[dir="rtl"] .button,
-html[dir="rtl"] nav a,
-html[dir="rtl"] .brand {
-  white-space: nowrap;
-}
-
-html[dir="rtl"] .mobile-menu {
-  text-align: right;
-}
-
-html[dir="rtl"] .skip-link {
-  left: auto;
-  right: 16px;
-}
-
-html[dir="rtl"] .faq details {
-  text-align: right;
-}
-
-html[dir="rtl"] .faq summary::after {
-  float: left;
-}
-
-html[dir="rtl"] [dir="ltr"] {
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
-@media (max-width: 760px) {
-  html[dir="rtl"] .timeline-item {
-    grid-template-columns: 1fr;
-  }
-
-  html[dir="rtl"] .nav-links {
-    text-align: right;
-  }
-}
+html[dir="rtl"] { font-family:"Vazirmatn","Segoe UI",Tahoma,Arial,sans-serif; text-rendering:optimizeLegibility; }
+html[dir="rtl"] body { letter-spacing:0; }
+html[dir="rtl"] .hero,html[dir="rtl"] .section-head,html[dir="rtl"] .feature,html[dir="rtl"] .arch-card,html[dir="rtl"] .release-panel,html[dir="rtl"] .footer,html[dir="rtl"] .faq { text-align:right; }
+html[dir="rtl"] .hero-kicker,html[dir="rtl"] .actions,html[dir="rtl"] .stack,html[dir="rtl"] .nav-actions,html[dir="rtl"] .release-meta { direction:rtl; }
+html[dir="rtl"] .feature-grid,html[dir="rtl"] .architecture,html[dir="rtl"] .dev-grid { direction:rtl; }
+html[dir="rtl"] .index { direction:ltr;display:inline-block;letter-spacing:.04em; }
+html[dir="rtl"] .timeline { border-left:0;border-right:1px solid var(--cyan); }
+html[dir="rtl"] .timeline>div { padding-left:0;padding-right:24px; }
+html[dir="rtl"] .timeline>div:before { left:auto;right:-5px; }
+html[dir="rtl"] .button,html[dir="rtl"] nav a,html[dir="rtl"] .brand { white-space:nowrap; }
+html[dir="rtl"] .mobile-menu,html[dir="rtl"] .faq details { text-align:right; }
+html[dir="rtl"] [dir="ltr"] { direction:ltr;unicode-bidi:isolate; }
+@media(max-width:760px){html[dir="rtl"] .timeline-item{grid-template-columns:1fr;}}
