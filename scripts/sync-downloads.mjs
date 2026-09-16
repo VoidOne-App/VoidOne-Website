@@ -13,7 +13,7 @@ const headers = {
 };
 
 async function download(url, destination) {
-  await exec('curl', ['-fsSL', '-H', `Accept: application/octet-stream`, '-H', `User-Agent: ${headers['User-Agent']}`, '-o', destination, url]);
+  await exec('curl', ['-fsSL', '-H', 'Accept: application/octet-stream', '-H', `User-Agent: ${headers['User-Agent']}`, '-o', destination, url]);
 }
 
 async function sha256(path) {
@@ -48,8 +48,8 @@ await download(portable.browser_download_url, '.download-sync/portable.zip');
 
 const installerBytes = (await readFile('.download-sync/installer.exe')).byteLength;
 const portableBytes = (await readFile('.download-sync/portable.zip')).byteLength;
-
 const version = release.tag_name || 'unknown';
+
 const manifest = {
   schema: 1,
   generated_at: new Date().toISOString(),
@@ -80,7 +80,7 @@ const manifest = {
 
 await writeFile('.download-sync/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 
-async function put(key, file, contentType, disposition) {
+async function put(key, file, contentType, disposition, cacheControl = 'public, max-age=31536000, immutable') {
   await exec('npx', [
     'wrangler@4.129.0',
     'r2', 'object', 'put', `${bucket}/${key}`,
@@ -88,13 +88,13 @@ async function put(key, file, contentType, disposition) {
     '--file', file,
     '--content-type', contentType,
     '--content-disposition', disposition,
-    '--cache-control', 'public, max-age=31536000, immutable'
+    '--cache-control', cacheControl
   ], { env: process.env });
 }
 
 await put(`releases/${version}/${installer.name}`, '.download-sync/installer.exe', 'application/vnd.microsoft.portable-executable', `attachment; filename="${installer.name}"`);
 await put(`releases/${version}/${portable.name}`, '.download-sync/portable.zip', 'application/zip', `attachment; filename="${portable.name}"`);
-await put(`manifest.json`, '.download-sync/manifest.json', 'application/json; charset=utf-8', 'inline');
+await put('releases/manifest.json', '.download-sync/manifest.json', 'application/json; charset=utf-8', 'inline', 'no-store');
 
 console.log(`Synced ${version}: ${installer.name}, ${portable.name}`);
 console.log(`Installer SHA-256: ${manifest.assets.installer.sha256}`);
