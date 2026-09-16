@@ -23,4 +23,8 @@ function getReleaseAsset(release, extensions) {
   return release?.assets?.find((asset) => asset.state === 'uploaded' && wanted.some((extension) => asset.name.toLowerCase().endsWith(extension))) || null;
 }
 
-window.VoidOneAPI = Object.freeze({ ...VOIDONE_GITHUB, githubJSON, getLatestRelease, getReleaseAsset });
+function getReleaseAssetURL(asset) {
+  return asset?.browser_download_url || null;
+}
+
+window.VoidOneAPI = Object.freeze({ ...VOIDONE_GITHUB, githubJSON, getLatestRelease, getReleaseAsset, getReleaseAssetURL });
