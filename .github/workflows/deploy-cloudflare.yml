@@ -36,13 +36,14 @@ jobs:
         run: |
           set -euo pipefail
           required=(
-            wrangler.jsonc
+            wrangler.jsonc src/worker.js
             site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
             site/fa/index.html site/fa/404.html site/fa/downloads.html site/fa/developers.html site/fa/about.html site/fa/faq.html
             site/_headers site/robots.txt site/sitemap.xml
             site/css/variables.css site/css/main.css site/css/responsive.css site/css/rtl.css
-            site/js/main.js site/js/github-api.js site/js/evolution.js
+            site/js/main.js site/js/github-api.js site/js/downloads.js site/js/evolution.js
             site/data/evolution.json site/assets/icons/favicon.svg site/assets/icons/voidone-mark.svg
+            scripts/sync-downloads.mjs
           )
           for file in "${required[@]}"; do
             test -f "$file" || { echo "::error::Missing required deployment file: $file"; exit 1; }
@@ -53,8 +54,12 @@ jobs:
         run: |
           set -euo pipefail
           grep -q '"name": "voidone-website"' wrangler.jsonc
+          grep -q '"main": "./src/worker.js"' wrangler.jsonc
           grep -q '"directory": "./site"' wrangler.jsonc
-          grep -q '"compatibility_date": "2026-09-05"' wrangler.jsonc
+          grep -q '"binding": "ASSETS"' wrangler.jsonc
+          grep -q '"binding": "VOIDONE_DOWNLOADS"' wrangler.jsonc
+          grep -q '"bucket_name": "voidone-downloads"' wrangler.jsonc
+          grep -q '"compatibility_date": "2026-09-16"' wrangler.jsonc
 
       - name: Verify current site sync
         shell: bash
@@ -63,7 +68,7 @@ jobs:
           node tests/site-sync-contract.js
           node tests/seo-contract.js
 
-      - name: Deploy static site with pinned Wrangler
+      - name: Deploy site and download worker with pinned Wrangler
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
