@@ -39,7 +39,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           required=(
             "${WORKER_CONFIG}"
             "src/worker.js"
@@ -67,7 +66,6 @@ jobs:
             "site/data/project.json"
             "site/data/features.json"
           )
-
           missing=0
           for file in "${required[@]}"; do
             if [[ ! -f "$file" ]]; then
@@ -75,7 +73,6 @@ jobs:
               missing=1
             fi
           done
-
           (( missing == 0 )) || exit 1
           echo "Deployment boundary: OK (${#required[@]} required files)"
 
@@ -124,28 +121,22 @@ jobs:
         run: |
           import json
           from pathlib import Path
-
           data = Path('site/data')
-          required = ('evolution.json', 'project.json', 'features.json')
-          for name in required:
+          for name in ('evolution.json', 'project.json', 'features.json'):
               path = data / name
               if not path.is_file():
                   raise SystemExit(f'Missing data file: {path}')
               json.loads(path.read_text(encoding='utf-8'))
-
           project = json.loads((data / 'project.json').read_text(encoding='utf-8'))
           for key in ('name', 'tagline', 'description', 'status', 'license', 'repository', 'website'):
               if not str(project.get(key, '')).strip():
                   raise SystemExit(f'project.json missing {key}')
-
           evolution = json.loads((data / 'evolution.json').read_text(encoding='utf-8'))
           if not isinstance(evolution, list):
               raise SystemExit('evolution.json must be an array')
-
           features = json.loads((data / 'features.json').read_text(encoding='utf-8'))
           if not isinstance(features, list):
               raise SystemExit('features.json must be an array')
-
           print('JSON contracts: OK')
 
       - name: HTML and SEO contracts
@@ -163,65 +154,49 @@ jobs:
           from pathlib import Path
           from urllib.parse import urlsplit
           import re
-
           root = Path('site').resolve()
           html_pattern = re.compile(r'''\b(?:href|src)\s*=\s*["']([^"'#?]+)''', re.I)
           css_pattern = re.compile(r'''url\(\s*["']?([^"')?#]+)''', re.I)
           external_schemes = {'http', 'https', 'mailto', 'tel', 'data', 'blob', 'javascript'}
           failures = []
           checked = 0
-
-          def resolve_reference(source: Path, reference: str) -> Path | None:
+          def resolve_reference(source: Path, reference: str):
               reference = reference.strip()
               if not reference or reference.startswith('//'):
                   return None
-
               parsed = urlsplit(reference)
               if parsed.scheme.lower() in external_schemes:
                   return None
-
               clean = parsed.path
               if not clean:
                   return None
-
-              if clean.startswith('/'):
-                  candidate = root / clean.lstrip('/')
-              else:
-                  candidate = source.parent / clean
-
+              candidate = root / clean.lstrip('/') if clean.startswith('/') else source.parent / clean
               candidate = candidate.resolve()
               try:
                   candidate.relative_to(root)
               except ValueError:
                   return None
               return candidate
-
           for path in sorted(root.rglob('*')):
               if not path.is_file() or path.suffix.lower() not in {'.html', '.css'}:
                   continue
-
               text = path.read_text(encoding='utf-8')
               pattern = html_pattern if path.suffix.lower() == '.html' else css_pattern
-
               for reference in pattern.findall(text):
                   candidate = resolve_reference(path, reference)
                   if candidate is None:
                       continue
-
                   checked += 1
                   valid = candidate.is_file() or candidate.is_dir()
                   if not valid and not candidate.suffix:
                       valid = (candidate.with_suffix('.html')).is_file() or (candidate / 'index.html').is_file()
-
                   if not valid:
                       failures.append(f'{path.relative_to(root)} -> {reference} -> {candidate.relative_to(root)}')
-
           if failures:
               print('::error::Broken local references:')
               for failure in failures:
                   print(f'::error::{failure}')
               raise SystemExit(f'Internal reference validation failed: {len(failures)} broken references')
-
           print(f'Internal references: OK ({checked} local references checked)')
           PY
 
@@ -233,12 +208,29 @@ jobs:
           grep -q '"main": "./src/worker.js"' "$WORKER_CONFIG"
           grep -q '"directory": "./site"' "$WORKER_CONFIG"
           grep -q '"binding": "ASSETS"' "$WORKER_CONFIG"
-          grep -q '"binding": "VOIDONE_DOWNLOADS"' "$WORKER_CONFIG"
-          grep -q '"bucket_name": "voidone-downloads"' "$WORKER_CONFIG"
           grep -q '"run_worker_first": \["/download/\*"\]' "$WORKER_CONFIG"
           grep -q '"preview_urls": false' "$WORKER_CONFIG"
           grep -q '"workers_dev": false' "$WORKER_CONFIG"
-          echo 'Wrangler configuration: OK'
+          if grep -Eq '"r2_buckets"|VOIDONE_DOWNLOADS|voidone-downloads' "$WORKER_CONFIG"; then
+            echo '::error::Obsolete R2 configuration is still present.'
+            exit 1
+          fi
+          echo 'Wrangler configuration: OK (Workers Assets + GitHub Releases)'
+
+      - name: Download layer contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "GITHUB_REPO = 'VoidOne-App/VoidOne'" src/worker.js
+          grep -q 'GITHUB_RELEASES_URL' src/worker.js
+          grep -q "provider: 'github-releases'" src/worker.js
+          grep -q "name.endsWith('.msi') || name.endsWith('.exe')" src/worker.js
+          grep -q "name.toLowerCase().endsWith('.zip')" src/worker.js
+          if grep -Eq 'VOIDONE_DOWNLOADS|DOWNLOAD_BUCKET_PREFIX' src/worker.js; then
+            echo '::error::Worker still contains obsolete R2 download code.'
+            exit 1
+          fi
+          echo 'Download layer: OK (GitHub Releases backend)'
 
   dry_run:
     name: Cloudflare Dry Run
@@ -322,5 +314,6 @@ jobs:
             echo "- **Branch:** ${GITHUB_REF_NAME}"
             echo "- **Wrangler:** ${WRANGLER_VERSION}"
             echo "- **Worker:** voidone-website"
+            echo "- **Download backend:** GitHub Releases"
             echo "- **Domain:** https://voidone.dpdns.org/"
           } >> "$GITHUB_STEP_SUMMARY"
