@@ -47,7 +47,6 @@ jobs:
           fetch-depth: 1
 
       - name: Repository state
-        shell: bash
         run: |
           set -euo pipefail
           test -d "$SITE_DIR"
@@ -57,48 +56,25 @@ jobs:
           test -f site/404.html
           echo "Repository: OK"
           echo "Commit: $GITHUB_SHA"
-          echo "Ref: $GITHUB_REF"
 
       - name: Required structure
-        shell: bash
         run: |
           set -euo pipefail
           required=(
-            site/index.html
-            site/404.html
-            site/downloads/index.html
-            site/platform/index.html
-            site/developers/index.html
-            site/project/index.html
-            site/fa/index.html
-            site/_headers
-            site/robots.txt
-            site/sitemap.xml
-            site/assets/icons/favicon.svg
-            site/assets/icons/voidone-mark.svg
-            site/css/core/base.css
-            site/css/core/layout.css
-            site/css/components/nav.css
-            site/css/pages/home.css
-            site/css/pages/downloads.css
-            site/css/pages/platform.css
-            site/css/pages/developers.css
-            site/css/pages/project.css
-            site/css/rtl.css
-            site/js/core/site.js
-            site/js/api/github.js
-            site/js/components/downloads.js
-            site/data/evolution.json
-            site/data/project.json
-            site/data/features.json
-            src/worker.js
-            wrangler.jsonc
+            site/index.html site/404.html site/downloads/index.html
+            site/platform/index.html site/developers/index.html site/project/index.html
+            site/fa/index.html site/_headers site/robots.txt site/sitemap.xml
+            site/assets/icons/favicon.svg site/assets/icons/voidone-mark.svg
+            site/css/core/base.css site/css/core/layout.css site/css/components/nav.css
+            site/css/pages/home.css site/css/pages/downloads.css
+            site/css/pages/platform.css site/css/pages/developers.css site/css/pages/project.css
+            site/css/rtl.css site/js/core/site.js site/js/api/github.js
+            site/js/components/downloads.js site/data/evolution.json
+            site/data/project.json site/data/features.json src/worker.js wrangler.jsonc
           )
           missing=()
           for file in "${required[@]}"; do
-            if [[ ! -f "$file" ]]; then
-              missing+=("$file")
-            fi
+            [[ -f "$file" ]] || missing+=("$file")
           done
           if (( ${#missing[@]} )); then
             printf '::error::Missing required file: %s\n' "${missing[@]}"
@@ -107,12 +83,9 @@ jobs:
           echo 'Required structure: OK'
 
       - name: Encoding and line endings
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          python - <<'PY'
           from pathlib import Path
-
           failures = []
           for path in Path('.').rglob('*'):
               if not path.is_file() or '.git' in path.parts or 'node_modules' in path.parts:
@@ -124,21 +97,17 @@ jobs:
                   continue
               if b'\r\n' in data:
                   failures.append(f'{path}: CRLF line endings')
-
           if failures:
-              for failure in failures:
-                  print(f'::error::{failure}')
+              for item in failures:
+                  print(f'::error::{item}')
               raise SystemExit(1)
-
           print('UTF-8 / LF policy: OK')
-          PY
 
       - name: Configuration sanity
         shell: python
         run: |
           import json
           from pathlib import Path
-
           config = json.loads(Path('wrangler.jsonc').read_text(encoding='utf-8'))
           assets = config.get('assets', {})
           checks = {
@@ -146,6 +115,8 @@ jobs:
               'asset directory': assets.get('directory') == './site',
               'asset binding': assets.get('binding') == 'ASSETS',
               'download worker route': '/download/*' in assets.get('run_worker_first', []),
+              'preview URLs disabled': config.get('preview_urls') is False,
+              'workers dev disabled': config.get('workers_dev') is False,
           }
           bad = [name for name, ok in checks.items() if not ok]
           if bad:
@@ -187,16 +158,13 @@ jobs:
                   attrs = dict(attrs)
                   tag = tag.lower()
                   if tag == 'html':
-                      self.lang = attrs.get('lang')
-                      self.dir = attrs.get('dir')
+                      self.lang, self.dir = attrs.get('lang'), attrs.get('dir')
                   elif tag == 'title':
                       self.title = True
                   elif tag == 'meta':
                       name = attrs.get('name', '').lower()
-                      if name == 'description' and attrs.get('content', '').strip():
-                          self.description = True
-                      if name == 'viewport':
-                          self.viewport = True
+                      self.description |= name == 'description' and bool(attrs.get('content', '').strip())
+                      self.viewport |= name == 'viewport'
                   elif tag == 'main':
                       self.main += 1
                   elif tag == 'h1':
@@ -205,48 +173,31 @@ jobs:
                       self.images.append(attrs)
                   elif tag == 'a':
                       self.links.append(attrs)
-                  self.inline_handlers.extend(
-                      key for key in attrs if key.lower().startswith('on')
-                  )
+                  self.inline_handlers.extend(key for key in attrs if key.lower().startswith('on'))
 
           failures = []
           pages = sorted(Path('site').rglob('*.html'))
-          if not pages:
-              failures.append('No HTML pages found')
-
           for path in pages:
               parser = Parser()
               parser.feed(path.read_text(encoding='utf-8'))
               rel = path.as_posix()
-
-              if not parser.lang:
-                  failures.append(f'{rel}: missing html lang')
-              if not parser.title:
-                  failures.append(f'{rel}: missing title')
-              if not parser.description:
-                  failures.append(f'{rel}: missing meta description')
-              if not parser.viewport:
-                  failures.append(f'{rel}: missing viewport')
-              if path.name != '404.html' and parser.main != 1:
-                  failures.append(f'{rel}: expected one main, found {parser.main}')
-              if path.name != '404.html' and parser.h1 != 1:
-                  failures.append(f'{rel}: expected one h1, found {parser.h1}')
+              if not parser.lang: failures.append(f'{rel}: missing html lang')
+              if not parser.title: failures.append(f'{rel}: missing title')
+              if not parser.description: failures.append(f'{rel}: missing meta description')
+              if not parser.viewport: failures.append(f'{rel}: missing viewport')
+              if path.name != '404.html' and parser.main != 1: failures.append(f'{rel}: expected one main')
+              if path.name != '404.html' and parser.h1 != 1: failures.append(f'{rel}: expected one h1')
               if rel == 'site/fa/index.html' and (parser.lang != 'fa' or parser.dir != 'rtl'):
                   failures.append(f'{rel}: expected lang="fa" dir="rtl"')
-
               for image in parser.images:
-                  if 'alt' not in image:
-                      failures.append(f'{rel}: image missing alt')
+                  if 'alt' not in image: failures.append(f'{rel}: image missing alt')
               for link in parser.links:
                   if link.get('target') == '_blank' and 'noopener' not in link.get('rel', '').lower():
                       failures.append(f'{rel}: target=_blank missing rel=noopener')
-              if parser.inline_handlers:
-                  failures.append(f'{rel}: inline event handlers are not allowed')
-
+              if parser.inline_handlers: failures.append(f'{rel}: inline event handlers are not allowed')
           if failures:
               print('\n'.join('::error::' + item for item in failures))
               raise SystemExit(1)
-
           print(f'HTML / SEO / Accessibility: OK ({len(pages)} pages)')
 
       - name: Internal links and static assets
@@ -254,54 +205,27 @@ jobs:
         run: |
           from pathlib import Path
           import re
-
           root = Path('site').resolve()
-          html_re = re.compile(r'''(?:href|src)\s*=\s*["']([^"'#?]+)''', re.I)
-          css_re = re.compile(r'''url\(\s*["']?([^"')?#]+)''', re.I)
+          patterns = {
+              '.html': re.compile(r'''(?:href|src)\s*=\s*["']([^"'#?]+)''', re.I),
+              '.css': re.compile(r'''url\(\s*["']?([^"')?#]+)''', re.I),
+          }
           failures = []
-
           for path in root.rglob('*'):
-              if not path.is_file() or path.suffix.lower() not in {'.html', '.css'}:
-                  continue
-
-              text = path.read_text(encoding='utf-8')
-              pattern = html_re if path.suffix.lower() == '.html' else css_re
-
-              for ref in pattern.findall(text):
-                  ref = ref.strip()
-                  if not ref:
-                      continue
-                  if re.match(r'^[A-Za-z][A-Za-z0-9+.-]*:', ref):
-                      continue
-                  if ref.startswith('/'):
-                      continue
-                  if not (ref.startswith('./') or ref.startswith('../') or '/' in ref or Path(ref).suffix):
-                      continue
-
+              if not path.is_file() or path.suffix.lower() not in patterns: continue
+              for ref in patterns[path.suffix.lower()].findall(path.read_text(encoding='utf-8')):
+                  if not ref or re.match(r'^[A-Za-z][A-Za-z0-9+.-]*:', ref) or ref.startswith('/'): continue
                   target = (path.parent / ref).resolve()
-                  if not target.exists():
-                      failures.append(f'{path.relative_to(root)} -> {ref}')
-
+                  if not target.exists(): failures.append(f'{path.relative_to(root)} -> {ref}')
           if failures:
-              print('::error::Broken local references:')
-              print('\n'.join(sorted(set(failures))))
+              print('::error::Broken local references:\n' + '\n'.join(sorted(set(failures))))
               raise SystemExit(1)
-
           print('Links / assets: OK')
 
       - name: Page consistency
-        shell: bash
         run: |
           set -euo pipefail
-          pages=(
-            site/index.html
-            site/downloads/index.html
-            site/platform/index.html
-            site/developers/index.html
-            site/project/index.html
-            site/fa/index.html
-          )
-          for page in "${pages[@]}"; do
+          for page in site/index.html site/downloads/index.html site/platform/index.html site/developers/index.html site/project/index.html site/fa/index.html; do
             grep -q '<header' "$page"
             grep -q '<footer' "$page"
           done
@@ -325,16 +249,11 @@ jobs:
           package-manager-cache: false
 
       - name: JavaScript and Worker syntax
-        shell: bash
         run: |
           set -euo pipefail
-          while IFS= read -r -d '' file; do
-            node --check "$file"
-          done < <(find site/js -type f -name '*.js' -print0)
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find site/js -type f -name '*.js' -print0)
           node --check src/worker.js
-          if [[ -f scripts/sync-downloads.mjs ]]; then
-            node --check scripts/sync-downloads.mjs
-          fi
+          [[ ! -f scripts/sync-downloads.mjs ]] || node --check scripts/sync-downloads.mjs
           echo 'JavaScript syntax: OK'
 
       - name: JSON validation and data contracts
@@ -342,52 +261,40 @@ jobs:
         run: |
           import json
           from pathlib import Path
-
           data_dir = Path('site/data')
           files = sorted(data_dir.glob('*.json'))
-          for path in files:
-              json.loads(path.read_text(encoding='utf-8'))
-
+          for path in files: json.loads(path.read_text(encoding='utf-8'))
           required = {'evolution.json', 'project.json', 'features.json'}
-          missing = required - {path.name for path in files}
-          if missing:
-              raise SystemExit('::error::Missing data files: ' + ', '.join(sorted(missing)))
-
+          missing = required - {p.name for p in files}
+          if missing: raise SystemExit('::error::Missing data files: ' + ', '.join(sorted(missing)))
           project = json.loads((data_dir / 'project.json').read_text(encoding='utf-8'))
           for key in ('name', 'tagline', 'description', 'status', 'license', 'repository', 'website'):
-              if not str(project.get(key, '')).strip():
-                  raise SystemExit(f'::error::project.json missing {key}')
-
-          evolution = json.loads((data_dir / 'evolution.json').read_text(encoding='utf-8'))
-          if not isinstance(evolution, list):
+              if not str(project.get(key, '')).strip(): raise SystemExit(f'::error::project.json missing {key}')
+          if not isinstance(json.loads((data_dir / 'evolution.json').read_text(encoding='utf-8')), list):
               raise SystemExit('::error::evolution.json must be an array')
-
           print(f'JSON / data contracts: OK ({len(files)} files)')
 
       - name: Runtime wiring
         shell: python
         run: |
           from pathlib import Path
-
           home = Path('site/index.html').read_text(encoding='utf-8')
           downloads = Path('site/downloads/index.html').read_text(encoding='utf-8')
           api = Path('site/js/api/github.js').read_text(encoding='utf-8')
           component = Path('site/js/components/downloads.js').read_text(encoding='utf-8')
-
           checks = {
               'shared runtime': 'js/core/site.js' in home,
               'GitHub module': 'js/api/github.js' in home,
               'download module': 'js/components/downloads.js' in home,
               'repository': 'VoidOne-App/VoidOne' in api,
-              'latest release': 'getLatestRelease' in api,
+              'release discovery': 'getLatestRelease' in api,
               'asset URL': 'browser_download_url' in api,
-              'download contract': 'data-download' in component,
-              'EXE target': 'data-download="exe"' in downloads,
+              'MSI target': 'data-download="msi"' in downloads,
               'ZIP target': 'data-download="zip"' in downloads,
+              'MSI handling': '.msi' in component,
           }
           bad = [name for name, ok in checks.items() if not ok]
-          if bad:
-              raise SystemExit('::error::Runtime wiring failed: ' + ', '.join(bad))
+          if bad: raise SystemExit('::error::Runtime wiring failed: ' + ', '.join(bad))
           print('Runtime wiring: OK')
 
   security:
@@ -405,7 +312,6 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-
           headers = Path('site/_headers').read_text(encoding='utf-8')
           required = {
               'X-Content-Type-Options:': 'nosniff',
@@ -415,81 +321,30 @@ jobs:
               'Cross-Origin-Resource-Policy:': 'same-origin',
               'Strict-Transport-Security:': 'max-age=31536000; includeSubDomains',
           }
-          bad = [f'{key} {value}' for key, value in required.items() if key not in headers or value not in headers]
-          if bad:
-              raise SystemExit('::error::Security header contract failed:\n' + '\n'.join(bad))
+          bad = [f'{k} {v}' for k, v in required.items() if k not in headers or v not in headers]
+          if bad: raise SystemExit('::error::Security header contract failed:\n' + '\n'.join(bad))
           print('Security headers: OK')
 
-      - name: Dangerous reference and external-resource policy
+      - name: Dangerous references and secret scan
         shell: python
         run: |
           from pathlib import Path
           import re
-
           failures = []
-          for path in Path('site').rglob('*'):
-              if not path.is_file() or path.suffix.lower() not in {'.html', '.css', '.js'}:
-                  continue
-              text = path.read_text(encoding='utf-8')
-              if re.search(r'<script[^>]+src=["\']http:', text, re.I):
-                  failures.append(f'{path}: insecure HTTP script')
-              if re.search(r'<link[^>]+href=["\']http:', text, re.I):
-                  failures.append(f'{path}: insecure HTTP stylesheet/link')
-              if re.search(r'javascript\s*:', text, re.I):
-                  failures.append(f'{path}: javascript: URL')
-
-          if failures:
-              raise SystemExit('::error::Security policy failed:\n' + '\n'.join(failures))
-          print('Dangerous references / external policy: OK')
-
-      - name: Secret-pattern scan
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
-
-          excluded = {'.git', '.wrangler', 'node_modules'}
-          patterns = [
+          secret_patterns = [
               re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
               re.compile(r'ghp_[A-Za-z0-9]{30,}'),
               re.compile(r'github_pat_[A-Za-z0-9_]{30,}'),
           ]
-          failures = []
-
-          for path in Path('.').rglob('*'):
-              if not path.is_file() or any(part in excluded for part in path.parts):
-                  continue
-              try:
-                  text = path.read_text(encoding='utf-8')
-              except (UnicodeDecodeError, OSError):
-                  continue
-              if any(pattern.search(text) for pattern in patterns):
-                  failures.append(str(path))
-
-          if failures:
-              raise SystemExit('::error::Potential secret material: ' + ', '.join(sorted(set(failures))))
-          print('Secret-pattern scan: OK')
-
-      - name: Unsafe configuration sanity
-        shell: python
-        run: |
-          import json
-          import re
-          from pathlib import Path
-
-          workflow = Path('.github/workflows/site.yml').read_text(encoding='utf-8')
-          config = json.loads(Path('wrangler.jsonc').read_text(encoding='utf-8'))
-          assets = config.get('assets', {})
-          checks = {
-              'workflow permissions': bool(re.search(r'^permissions:\s*\n\s+contents:\s*read\s*$', workflow, re.M)),
-              'preview URLs disabled': config.get('preview_urls') is False,
-              'workers dev disabled': config.get('workers_dev') is False,
-              'download route configured': '/download/*' in assets.get('run_worker_first', []),
-          }
-          bad = [name for name, ok in checks.items() if not ok]
-          if bad:
-              raise SystemExit('::error::Unsafe configuration sanity failed: ' + ', '.join(bad))
-          print('Unsafe configuration sanity: OK')
+          for path in Path('site').rglob('*'):
+              if not path.is_file() or path.suffix.lower() not in {'.html', '.css', '.js'}: continue
+              text = path.read_text(encoding='utf-8')
+              if re.search(r'<script[^>]+src=["\']http:', text, re.I): failures.append(f'{path}: insecure HTTP script')
+              if re.search(r'<link[^>]+href=["\']http:', text, re.I): failures.append(f'{path}: insecure HTTP link')
+              if re.search(r'javascript\s*:', text, re.I): failures.append(f'{path}: javascript: URL')
+              if any(p.search(text) for p in secret_patterns): failures.append(f'{path}: potential secret')
+          if failures: raise SystemExit('::error::Security policy failed:\n' + '\n'.join(failures))
+          print('Security policy: OK')
 
   integration:
     name: Integration
@@ -504,78 +359,53 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: VoidOne repository reachability
+      - name: VoidOne repository and releases API
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 4 --retry-all-errors --connect-timeout 10 --max-time 30 \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${VOIDONE_REPO}" > /tmp/voidone.json
+          api="https://api.github.com/repos/${VOIDONE_REPO}"
+          headers=(-H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --connect-timeout 10 --max-time 30 "${headers[@]}" "$api" > /tmp/voidone.json
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --connect-timeout 10 --max-time 30 "${headers[@]}" "$api/releases?per_page=20" > /tmp/releases.json
           python - <<'PY'
           import json
-          data = json.load(open('/tmp/voidone.json', encoding='utf-8'))
-          if data.get('full_name') != 'VoidOne-App/VoidOne':
-              raise SystemExit('::error::Unexpected repository response')
-          print('VoidOne repository: reachable')
+          repo = json.load(open('/tmp/voidone.json', encoding='utf-8'))
+          releases = json.load(open('/tmp/releases.json', encoding='utf-8'))
+          if repo.get('full_name') != 'VoidOne-App/VoidOne':
+              raise SystemExit('::error::Unexpected VoidOne repository response')
+          release = next((r for r in releases if not r.get('draft')), None)
+          if not release:
+              raise SystemExit('::error::No non-draft VoidOne release found')
+          assets = release.get('assets', [])
+          installer = next((a for a in assets if a.get('name', '').lower().endswith('.msi')), None)
+          portable = next((a for a in assets if a.get('name', '').lower().endswith('.zip') and not a.get('name', '').lower().endswith('.sha256')), None)
+          if not installer or not portable:
+              raise SystemExit(f'::error::Release {release.get("tag_name")} missing MSI or portable ZIP')
+          json.dump(release, open('/tmp/latest-release.json', 'w', encoding='utf-8'))
+          print(f'VoidOne release: {release["tag_name"]}')
+          print(f'Installer: {installer["name"]}')
+          print(f'Portable: {portable["name"]}')
           PY
-
-      - name: GitHub Releases API
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --retry 4 --retry-all-errors --connect-timeout 10 --max-time 30 \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${VOIDONE_REPO}/releases/latest" > /tmp/latest-release.json
-          python - <<'PY'
-          import json
-          data = json.load(open('/tmp/latest-release.json', encoding='utf-8'))
-          if not data.get('tag_name'):
-              raise SystemExit('::error::Latest release missing tag_name')
-          print('Latest release API: OK ->', data['tag_name'])
-          PY
-
-      - name: Release asset inspection
-        shell: python
-        run: |
-          import json
-          data = json.load(open('/tmp/latest-release.json', encoding='utf-8'))
-          assets = data.get('assets', [])
-          names = [asset.get('name', '') for asset in assets]
-          exe = any(name.lower().endswith('.exe') for name in names)
-          zip_asset = any(name.lower().endswith('.zip') for name in names)
-          if not (exe and zip_asset):
-              raise SystemExit(f'::error::Latest release missing required assets: EXE={exe}, ZIP={zip_asset}')
-          print(f'Release assets: OK ({len(assets)} assets)')
 
       - name: Download abstraction
         shell: python
         run: |
           from pathlib import Path
-
-          component = Path('site/js/components/downloads.js').read_text(encoding='utf-8')
           api = Path('site/js/api/github.js').read_text(encoding='utf-8')
+          component = Path('site/js/components/downloads.js').read_text(encoding='utf-8')
           page = Path('site/downloads/index.html').read_text(encoding='utf-8')
           checks = {
               'release helper': 'getReleaseAssetURL' in api,
-              'component uses helper': 'getReleaseAssetURL' in component,
+              'release list discovery': 'releases?per_page=20' in api,
+              'MSI asset': '.msi' in component,
+              'ZIP asset': '.zip' in component,
               'installer target': 'data-installer' in page,
               'portable target': 'data-portable' in page,
+              'API fallback': 'catch' in component,
           }
           bad = [name for name, ok in checks.items() if not ok]
-          if bad:
-              raise SystemExit('::error::Download abstraction failed: ' + ', '.join(bad))
+          if bad: raise SystemExit('::error::Download abstraction failed: ' + ', '.join(bad))
           print('Download abstraction: OK')
-
-      - name: API failure handling
-        shell: python
-        run: |
-          from pathlib import Path
-          text = Path('site/js/components/downloads.js').read_text(encoding='utf-8')
-          if 'catch' not in text or 'release' not in text:
-              raise SystemExit('::error::Download API failure handling missing')
-          print('API failure handling: OK')
 
   deployment_validation:
     name: Deployment Validation
@@ -597,15 +427,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install Wrangler
-        shell: bash
         run: npm install --no-save --no-package-lock "wrangler@${WRANGLER_VERSION}"
 
-      - name: Wrangler configuration validation
-        shell: bash
+      - name: Wrangler dry-run
         run: npx wrangler deploy --dry-run --outdir .wrangler-ci-dist
 
       - name: Workers Assets output
-        shell: bash
         run: |
           set -euo pipefail
           test -d .wrangler-ci-dist
@@ -618,8 +445,7 @@ jobs:
           import json
           from pathlib import Path
           config = json.loads(Path('wrangler.jsonc').read_text(encoding='utf-8'))
-          routes = config.get('assets', {}).get('run_worker_first', [])
-          if '/download/*' not in routes:
+          if '/download/*' not in config.get('assets', {}).get('run_worker_first', []):
               raise SystemExit('::error::Missing /download/* worker boundary')
           print('Download route boundary: OK')
 
@@ -635,7 +461,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Publish summary
+      - name: Publish summary and final gate
         shell: bash
         env:
           PREFLIGHT: ${{ needs.preflight.result }}
@@ -657,13 +483,7 @@ jobs:
             echo "| Integration | $INTEGRATION |"
             echo "| Deployment Validation | $DEPLOYMENT |"
           } >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ "$PREFLIGHT" == success && \
-                "$STATIC" == success && \
-                "$CODE" == success && \
-                "$SECURITY" == success && \
-                "$INTEGRATION" == success && \
-                "$DEPLOYMENT" == success ]]; then
+          if [[ "$PREFLIGHT" == success && "$STATIC" == success && "$CODE" == success && "$SECURITY" == success && "$INTEGRATION" == success && "$DEPLOYMENT" == success ]]; then
             echo 'Final gate: PASSED'
           else
             echo 'Final gate: FAILED'
