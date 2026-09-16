@@ -1,15 +1,6 @@
 const DOWNLOAD_PREFIX = '/download/';
-const DOWNLOAD_BUCKET_PREFIX = 'releases/';
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
-const MANIFEST_CACHE_TTL = 300;
-
-function contentTypeFor(pathname) {
-  if (pathname.endsWith('.exe')) return 'application/vnd.microsoft.portable-executable';
-  if (pathname.endsWith('.zip')) return 'application/zip';
-  if (pathname.endsWith('.json')) return 'application/json; charset=utf-8';
-  return 'application/octet-stream';
-}
 
 function sanitizeDownloadPath(pathname) {
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
@@ -53,13 +44,16 @@ async function buildManifest() {
   const release = await fetchLatestRelease();
   if (!release) throw new Error('No public release found');
 
-  const installer = release.assets.find((asset) => asset.name.toLowerCase().endsWith('.exe'));
+  const installer = release.assets.find((asset) => {
+    const name = asset.name.toLowerCase();
+    return name.endsWith('.msi') || name.endsWith('.exe');
+  });
   const portable = release.assets.find((asset) => asset.name.toLowerCase().endsWith('.zip'));
 
   return {
     schema: 1,
     generated_at: new Date().toISOString(),
-    provider: 'voidone-download-layer',
+    provider: 'github-releases',
     release: {
       version: release.tag_name,
       name: release.name || release.tag_name,
@@ -123,39 +117,8 @@ export default {
       const relativePath = sanitizeDownloadPath(url.pathname);
       if (!relativePath) return new Response('Not Found', { status: 404 });
 
-      if (env.VOIDONE_DOWNLOADS) {
-        const key = `${DOWNLOAD_BUCKET_PREFIX}${relativePath}`;
-        const object = await env.VOIDONE_DOWNLOADS.get(key, {
-          onlyIf: request.headers,
-          range: request.headers
-        });
-
-        if (object && ('body' in object) && object.body) {
-          const headers = new Headers();
-          object.writeHttpMetadata(headers);
-          headers.set('etag', object.httpEtag);
-          headers.set('cache-control', object.httpMetadata?.cacheControl || 'public, max-age=31536000, immutable');
-          headers.set('content-type', object.httpMetadata?.contentType || contentTypeFor(relativePath));
-          headers.set('content-disposition', object.httpMetadata?.contentDisposition || `attachment; filename="${decodeURIComponent(relativePath.split('/').pop())}"`);
-          headers.set('accept-ranges', 'bytes');
-
-          if (object.range) {
-            const offset = object.range.offset ?? 0;
-            const length = object.range.length ?? object.size - offset;
-            headers.set('content-range', `bytes ${offset}-${offset + length - 1}/${object.size}`);
-            headers.set('content-length', String(length));
-            return new Response(request.method === 'HEAD' ? null : object.body, { status: 206, headers });
-          }
-
-          headers.set('content-length', String(object.size));
-          return new Response(request.method === 'HEAD' ? null : object.body, { status: 200, headers });
-        }
-      }
-
       const upstream = await redirectToGitHubAsset(relativePath);
-      if (upstream) {
-        return Response.redirect(upstream, 302);
-      }
+      if (upstream) return Response.redirect(upstream, 302);
 
       return new Response('Download Not Found', { status: 404 });
     }
