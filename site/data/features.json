@@ -1,0 +1,8 @@
+[
+  {"id":"library","title":"Game Library","description":"Organize and launch games already available on your machine."},
+  {"id":"steam","title":"Steam Integration","description":"Discover Steam installations and executable paths on Windows."},
+  {"id":"saves","title":"Save Backups","description":"Manage local backups for important game-save data."},
+  {"id":"diagnostics","title":"Diagnostics","description":"Use logs and diagnostics to make troubleshooting practical."},
+  {"id":"localization","title":"Localization","description":"Support localized interfaces, including RTL experiences."},
+  {"id":"release","title":"Release Engineering","description":"Automated builds, tests and packaged release artifacts."}
+]
