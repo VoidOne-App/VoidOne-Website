@@ -161,35 +161,68 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+          from urllib.parse import urlsplit
           import re
 
-          root = Path('site')
-          refs = []
-          for path in root.rglob('*'):
-              if not path.is_file() or path.suffix not in {'.html', '.css'}:
-                  continue
-              text = path.read_text(encoding='utf-8')
-              if path.suffix == '.html':
-                  refs.extend(re.findall(r'\b(?:href|src)=["\']([^"\'#?]+)', text))
+          root = Path('site').resolve()
+          html_pattern = re.compile(r'''\b(?:href|src)\s*=\s*["']([^"'#?]+)''', re.I)
+          css_pattern = re.compile(r'''url\(\s*["']?([^"')?#]+)''', re.I)
+          external_schemes = {'http', 'https', 'mailto', 'tel', 'data', 'blob', 'javascript'}
+          failures = []
+          checked = 0
+
+          def resolve_reference(source: Path, reference: str) -> Path | None:
+              reference = reference.strip()
+              if not reference or reference.startswith('//'):
+                  return None
+
+              parsed = urlsplit(reference)
+              if parsed.scheme.lower() in external_schemes:
+                  return None
+
+              clean = parsed.path
+              if not clean:
+                  return None
+
+              if clean.startswith('/'):
+                  candidate = root / clean.lstrip('/')
               else:
-                  refs.extend(re.findall(r'url\(["\']?([^"\')?#]+)', text))
+                  candidate = source.parent / clean
 
-          ignored = ('http://', 'https://', '//', 'data:', 'mailto:', 'tel:', '#')
-          broken = []
-          for ref in refs:
-              if not ref or ref.startswith(ignored):
+              candidate = candidate.resolve()
+              try:
+                  candidate.relative_to(root)
+              except ValueError:
+                  return None
+              return candidate
+
+          for path in sorted(root.rglob('*')):
+              if not path.is_file() or path.suffix.lower() not in {'.html', '.css'}:
                   continue
-              candidate = (root / ref.lstrip('/')).resolve()
-              if not candidate.exists():
-                  source = 'site'
-                  broken.append((source, ref))
 
-          if broken:
-              for source, ref in broken[:50]:
-                  print(f'::error::Broken local reference from {source}: {ref}')
-              raise SystemExit(f'Internal reference validation failed: {len(broken)} broken references')
+              text = path.read_text(encoding='utf-8')
+              pattern = html_pattern if path.suffix.lower() == '.html' else css_pattern
 
-          print('Internal references: OK')
+              for reference in pattern.findall(text):
+                  candidate = resolve_reference(path, reference)
+                  if candidate is None:
+                      continue
+
+                  checked += 1
+                  valid = candidate.is_file() or candidate.is_dir()
+                  if not valid and not candidate.suffix:
+                      valid = (candidate.with_suffix('.html')).is_file() or (candidate / 'index.html').is_file()
+
+                  if not valid:
+                      failures.append(f'{path.relative_to(root)} -> {reference} -> {candidate.relative_to(root)}')
+
+          if failures:
+              print('::error::Broken local references:')
+              for failure in failures:
+                  print(f'::error::{failure}')
+              raise SystemExit(f'Internal reference validation failed: {len(failures)} broken references')
+
+          print(f'Internal references: OK ({checked} local references checked)')
           PY
 
       - name: Wrangler configuration contract
