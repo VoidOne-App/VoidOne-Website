@@ -13,12 +13,16 @@ concurrency:
   group: cloudflare-production
   cancel-in-progress: true
 
-jobs:
-  deploy:
-    name: Deploy to Cloudflare Workers
-    runs-on: ubuntu-latest
-    environment: production
+env:
+  NODE_VERSION: '22'
+  WRANGLER_VERSION: '4.132.0'
+  WORKER_CONFIG: './wrangler.jsonc'
 
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -28,52 +32,262 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
 
-      - name: Validate static site boundary
+      - name: Repository and deployment boundary
         shell: bash
         run: |
           set -euo pipefail
+
           required=(
-            wrangler.jsonc src/worker.js
-            site/index.html site/404.html site/downloads.html site/developers.html site/about.html site/faq.html
-            site/fa/index.html site/fa/404.html site/fa/downloads.html site/fa/developers.html site/fa/about.html site/fa/faq.html
-            site/_headers site/robots.txt site/sitemap.xml
-            site/css/variables.css site/css/main.css site/css/responsive.css site/css/rtl.css
-            site/js/main.js site/js/github-api.js site/js/downloads.js site/js/evolution.js
-            site/data/evolution.json site/assets/icons/favicon.svg site/assets/icons/voidone-mark.svg
-            scripts/sync-downloads.mjs
+            "${WORKER_CONFIG}"
+            "src/worker.js"
+            "site/index.html"
+            "site/404.html"
+            "site/downloads/index.html"
+            "site/platform/index.html"
+            "site/developers/index.html"
+            "site/project/index.html"
+            "site/fa/index.html"
+            "site/_headers"
+            "site/robots.txt"
+            "site/sitemap.xml"
+            "site/assets/icons/favicon.svg"
+            "site/assets/icons/voidone-mark.svg"
+            "site/css/variables.css"
+            "site/css/core/base.css"
+            "site/css/core/layout.css"
+            "site/css/components/nav.css"
+            "site/css/pages/home.css"
+            "site/js/core/site.js"
+            "site/js/api/github.js"
+            "site/js/components/downloads.js"
+            "site/data/evolution.json"
+            "site/data/project.json"
+            "site/data/features.json"
           )
+
+          missing=0
           for file in "${required[@]}"; do
-            test -f "$file" || { echo "::error::Missing required deployment file: $file"; exit 1; }
+            if [[ ! -f "$file" ]]; then
+              echo "::error::Missing required deployment file: $file"
+              missing=1
+            fi
           done
 
-      - name: Verify Wrangler configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q '"name": "voidone-website"' wrangler.jsonc
-          grep -q '"main": "./src/worker.js"' wrangler.jsonc
-          grep -q '"directory": "./site"' wrangler.jsonc
-          grep -q '"binding": "ASSETS"' wrangler.jsonc
-          grep -q '"binding": "VOIDONE_DOWNLOADS"' wrangler.jsonc
-          grep -q '"bucket_name": "voidone-downloads"' wrangler.jsonc
-          grep -q '"compatibility_date": "2026-09-16"' wrangler.jsonc
+          (( missing == 0 )) || exit 1
+          echo "Deployment boundary: OK (${#required[@]} required files)"
 
-      - name: Verify current site sync
+      - name: Repository hygiene
         shell: bash
         run: |
           set -euo pipefail
-          node tests/site-sync-contract.js
+          if git ls-files -z | grep -zEq '(^|/)\.env($|\.)|(^|/)(id_rsa|id_ed25519)$'; then
+            echo '::error::Potential secret or private-key file is tracked.'
+            exit 1
+          fi
+          if git status --porcelain | grep -q .; then
+            echo '::error::Checkout is not clean.'
+            exit 1
+          fi
+          echo 'Repository hygiene: OK'
+
+  validate:
+    name: Validate
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find site/js src -type f -name '*.js' -print0)
+          echo 'JavaScript syntax: OK'
+
+      - name: JSON contracts
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          data = Path('site/data')
+          required = ('evolution.json', 'project.json', 'features.json')
+          for name in required:
+              path = data / name
+              if not path.is_file():
+                  raise SystemExit(f'Missing data file: {path}')
+              json.loads(path.read_text(encoding='utf-8'))
+
+          project = json.loads((data / 'project.json').read_text(encoding='utf-8'))
+          for key in ('name', 'tagline', 'description', 'status', 'license', 'repository', 'website'):
+              if not str(project.get(key, '')).strip():
+                  raise SystemExit(f'project.json missing {key}')
+
+          evolution = json.loads((data / 'evolution.json').read_text(encoding='utf-8'))
+          if not isinstance(evolution, list):
+              raise SystemExit('evolution.json must be an array')
+
+          features = json.loads((data / 'features.json').read_text(encoding='utf-8'))
+          if not isinstance(features, list):
+              raise SystemExit('features.json must be an array')
+
+          print('JSON contracts: OK')
+
+      - name: HTML and SEO contracts
+        shell: bash
+        run: |
+          set -euo pipefail
           node tests/seo-contract.js
+          echo 'HTML / SEO contracts: OK'
 
-      - name: Deploy site and download worker with pinned Wrangler
+      - name: Internal reference validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('site')
+          refs = []
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix not in {'.html', '.css'}:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if path.suffix == '.html':
+                  refs.extend(re.findall(r'\b(?:href|src)=["\']([^"\'#?]+)', text))
+              else:
+                  refs.extend(re.findall(r'url\(["\']?([^"\')?#]+)', text))
+
+          ignored = ('http://', 'https://', '//', 'data:', 'mailto:', 'tel:', '#')
+          broken = []
+          for ref in refs:
+              if not ref or ref.startswith(ignored):
+                  continue
+              candidate = (root / ref.lstrip('/')).resolve()
+              if not candidate.exists():
+                  source = 'site'
+                  broken.append((source, ref))
+
+          if broken:
+              for source, ref in broken[:50]:
+                  print(f'::error::Broken local reference from {source}: {ref}')
+              raise SystemExit(f'Internal reference validation failed: {len(broken)} broken references')
+
+          print('Internal references: OK')
+          PY
+
+      - name: Wrangler configuration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '"name": "voidone-website"' "$WORKER_CONFIG"
+          grep -q '"main": "./src/worker.js"' "$WORKER_CONFIG"
+          grep -q '"directory": "./site"' "$WORKER_CONFIG"
+          grep -q '"binding": "ASSETS"' "$WORKER_CONFIG"
+          grep -q '"binding": "VOIDONE_DOWNLOADS"' "$WORKER_CONFIG"
+          grep -q '"bucket_name": "voidone-downloads"' "$WORKER_CONFIG"
+          grep -q '"run_worker_first": \["/download/\*"\]' "$WORKER_CONFIG"
+          grep -q '"preview_urls": false' "$WORKER_CONFIG"
+          grep -q '"workers_dev": false' "$WORKER_CONFIG"
+          echo 'Wrangler configuration: OK'
+
+  dry_run:
+    name: Cloudflare Dry Run
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Install pinned Wrangler
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package="wrangler@${WRANGLER_VERSION}" -- wrangler --version
+
+      - name: Validate deployment with Wrangler
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package="wrangler@${WRANGLER_VERSION}" -- \
+            wrangler deploy --config "$WORKER_CONFIG" --dry-run
+          echo 'Cloudflare deployment dry-run: OK'
+
+  deploy:
+    name: Production Deployment
+    needs: dry_run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Verify deployment credentials are present
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npm exec --yes --package=wrangler@4.129.0 -- \
-            wrangler deploy --config ./wrangler.jsonc
+          [[ -n "$CLOUDFLARE_API_TOKEN" ]] || { echo '::error::CLOUDFLARE_API_TOKEN is not configured.'; exit 1; }
+          [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]] || { echo '::error::CLOUDFLARE_ACCOUNT_ID is not configured.'; exit 1; }
+          echo 'Cloudflare credentials: present'
+
+      - name: Deploy production worker
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npm exec --yes --package="wrangler@${WRANGLER_VERSION}" -- \
+            wrangler deploy --config "$WORKER_CONFIG"
+          echo 'Production deployment: OK'
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Cloudflare Production Deployment'
+            echo
+            echo "- **Commit:** ${GITHUB_SHA}"
+            echo "- **Branch:** ${GITHUB_REF_NAME}"
+            echo "- **Wrangler:** ${WRANGLER_VERSION}"
+            echo "- **Worker:** voidone-website"
+            echo "- **Domain:** https://voidone.dpdns.org/"
+          } >> "$GITHUB_STEP_SUMMARY"
