@@ -1,6 +1,7 @@
 const DOWNLOAD_PREFIX = '/download/';
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
+const MANIFEST_CACHE_TTL = 300;
 
 function sanitizeDownloadPath(pathname) {
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
@@ -68,14 +69,27 @@ async function buildManifest() {
   };
 }
 
-async function handleManifest(request) {
+async function getCachedManifest(request, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(`${DOWNLOAD_PREFIX}manifest.json`, request.url).toString(), { method: 'GET' });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const manifest = await buildManifest();
+  const response = jsonResponse(manifest, `public, max-age=${MANIFEST_CACHE_TTL}, s-maxage=${MANIFEST_CACHE_TTL}`);
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
+}
+
+async function handleManifest(request, ctx) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
   }
 
   try {
-    const manifest = await buildManifest();
-    return jsonResponse(request.method === 'HEAD' ? null : manifest);
+    const response = await getCachedManifest(request, ctx);
+    if (request.method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
+    return response;
   } catch (error) {
     return jsonResponse({
       schema: 1,
@@ -99,11 +113,11 @@ async function redirectToGitHubAsset(relativePath) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === `${DOWNLOAD_PREFIX}manifest.json`) {
-      return handleManifest(request);
+      return handleManifest(request, ctx);
     }
 
     if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {
