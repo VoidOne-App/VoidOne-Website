@@ -8,12 +8,6 @@
     "binding": "ASSETS",
     "run_worker_first": ["/download/*"]
   },
-  "r2_buckets": [
-    {
-      "binding": "VOIDONE_DOWNLOADS",
-      "bucket_name": "voidone-downloads"
-    }
-  ],
   "workers_dev": false,
   "preview_urls": false
 }
