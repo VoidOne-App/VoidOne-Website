@@ -1,0 +1,55 @@
+{
+  "name": "voidone-ai",
+  "elements": [
+    {
+      "id": "start",
+      "type": "start",
+      "outputs": {
+        "next": {
+          "elementId": "rate-limit"
+        }
+      }
+    },
+    {
+      "id": "rate-limit",
+      "type": "rate",
+      "properties": {
+        "key": "ip",
+        "limit": 10,
+        "limitType": "count",
+        "window": 300
+      },
+      "outputs": {
+        "success": {
+          "elementId": "glm"
+        },
+        "fallback": {
+          "elementId": "end"
+        }
+      }
+    },
+    {
+      "id": "glm",
+      "type": "model",
+      "properties": {
+        "provider": "workers-ai",
+        "model": "@cf/zai-org/glm-4.7-flash",
+        "retries": 1,
+        "timeout": 30000
+      },
+      "outputs": {
+        "success": {
+          "elementId": "end"
+        },
+        "fallback": {
+          "elementId": "end"
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "outputs": {}
+    }
+  ]
+}
