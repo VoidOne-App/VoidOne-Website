@@ -4,6 +4,8 @@ const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
 const MANIFEST_CACHE_TTL = 300;
 const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
+const AI_GATEWAY_ID = 'voidone_al';
+const AI_DYNAMIC_ROUTE = 'dynamic/voidone-ai';
 const AI_MAX_INPUT_CHARS = 2000;
 const AI_MAX_OUTPUT_TOKENS = 256;
 const AI_RATE_LIMIT = 10;
@@ -148,6 +150,46 @@ async function checkAiRateLimit(request) {
   return true;
 }
 
+function buildAiMessages(message) {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are VoidOne AI, the assistant for the VoidOne native PC gaming platform.',
+        'Help with VoidOne features, installation, releases, documentation, and general troubleshooting.',
+        'Do not invent VoidOne features, release information, or technical facts.',
+        'If you do not know something about VoidOne, say so clearly.',
+        'Keep answers concise and useful.'
+      ].join(' ')
+    },
+    { role: 'user', content: message }
+  ];
+}
+
+async function runAi(env, message) {
+  const gateway = env.Voidone_al.gateway(AI_GATEWAY_ID);
+  return gateway.run({
+    provider: 'compat',
+    endpoint: 'chat/completions',
+    headers: {},
+    query: {
+      model: AI_DYNAMIC_ROUTE,
+      messages: buildAiMessages(message),
+      max_tokens: AI_MAX_OUTPUT_TOKENS
+    }
+  });
+}
+
+function extractAiResponse(result) {
+  if (typeof result === 'string') return result;
+  return result?.choices?.[0]?.message?.content
+    || result?.response
+    || result?.result
+    || result?.output_text
+    || result?.text
+    || JSON.stringify(result);
+}
+
 async function handleAi(request, env) {
   const corsHeaders = {
     'access-control-allow-origin': 'https://voidone.dpdns.org',
@@ -176,28 +218,14 @@ async function handleAi(request, env) {
   }
 
   try {
-    const result = await env.Voidone_al.run(AI_MODEL, {
-      prompt: [
-        'You are VoidOne AI, the assistant for the VoidOne native PC gaming platform.',
-        'Help with VoidOne features, installation, releases, documentation, and general troubleshooting.',
-        'Do not invent VoidOne features, release information, or technical facts.',
-        'If you do not know something about VoidOne, say so clearly.',
-        'Keep answers concise and useful.',
-        '',
-        `User: ${message}`
-      ].join('\n'),
-      max_tokens: AI_MAX_OUTPUT_TOKENS
-    });
+    const result = await runAi(env, message);
+    const responseText = extractAiResponse(result);
 
-    const responseText = typeof result === 'string'
-      ? result
-      : result?.response || result?.result || result?.output_text || result?.text || JSON.stringify(result);
-
-    return jsonResponse({ model: AI_MODEL, response: responseText }, 'no-store', 200, corsHeaders);
+    return jsonResponse({ model: AI_DYNAMIC_ROUTE, response: responseText }, 'no-store', 200, corsHeaders);
   } catch (error) {
     return jsonResponse({
       error: 'ai_unavailable',
-      message: error instanceof Error ? error.message : 'Workers AI request failed'
+      message: error instanceof Error ? error.message : 'AI Gateway request failed'
     }, 'no-store', 503, corsHeaders);
   }
 }
