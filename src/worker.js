@@ -1,4 +1,7 @@
 const DOWNLOAD_PREFIX = '/download/';
+const GITHUB_REPO = 'VoidOne-App/VoidOne';
+const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
+const MANIFEST_CACHE_TTL = 300;
 
 function sanitizeDownloadPath(pathname) {
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
@@ -111,19 +114,18 @@ async function redirectToGitHubAsset(relativePath) {
   }
 }
 
-function getAiClientIp(request) {
-  return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() || 'unknown';
-}
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
 
-async function checkAiRateLimit(request) {
-  const ip = getAiClientIp(request);
-  const key = new Request(`https://voidone-ai-rate-limit.invalid/${encodeURIComponent(ip)}`);
-  const cache = caches.default;
-  const existing = await cache.match(key);
-  let count = 0;
+    if (url.pathname === `${DOWNLOAD_PREFIX}manifest.json`) {
+      return handleManifest(request, ctx);
+    }
 
-  if (existing) {
-    conss: 405,
+    if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response('Method Not Allowed', {
+          status: 405,
           headers: { Allow: 'GET, HEAD' }
         });
       }
