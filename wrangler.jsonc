@@ -3,10 +3,13 @@
   "name": "voidone-website",
   "main": "./src/worker.js",
   "compatibility_date": "2026-09-16",
+  "ai": {
+    "binding": "AI"
+  },
   "assets": {
     "directory": "./site",
     "binding": "ASSETS",
-    "run_worker_first": ["/download/*"]
+    "run_worker_first": ["/download/*", "/api/*"]
   },
   "workers_dev": false,
   "preview_urls": false
