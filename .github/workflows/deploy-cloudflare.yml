@@ -62,6 +62,7 @@ jobs:
             "site/js/core/site.js"
             "site/js/api/github.js"
             "site/js/components/downloads.js"
+            "site/js/components/ai.js"
             "site/data/evolution.json"
             "site/data/project.json"
             "site/data/features.json"
@@ -208,14 +209,15 @@ jobs:
           grep -q '"main": "./src/worker.js"' "$WORKER_CONFIG"
           grep -q '"directory": "./site"' "$WORKER_CONFIG"
           grep -q '"binding": "ASSETS"' "$WORKER_CONFIG"
-          grep -q '"run_worker_first": \["/download/\*"\]' "$WORKER_CONFIG"
+          grep -q '"binding": "AI"' "$WORKER_CONFIG"
+          grep -q '"run_worker_first": \["/download/\*", "/api/\*"]' "$WORKER_CONFIG"
           grep -q '"preview_urls": false' "$WORKER_CONFIG"
           grep -q '"workers_dev": false' "$WORKER_CONFIG"
           if grep -Eq '"r2_buckets"|VOIDONE_DOWNLOADS|voidone-downloads' "$WORKER_CONFIG"; then
             echo '::error::Obsolete R2 configuration is still present.'
             exit 1
           fi
-          echo 'Wrangler configuration: OK (Workers Assets + GitHub Releases)'
+          echo 'Wrangler configuration: OK (Workers Assets + Workers AI + GitHub Releases)'
 
       - name: Workers AI layer contract
         shell: bash
@@ -326,5 +328,6 @@ jobs:
             echo "- **Wrangler:** ${WRANGLER_VERSION}"
             echo "- **Worker:** voidone-website"
             echo "- **Download backend:** GitHub Releases"
+            echo "- **AI:** Cloudflare Workers AI / `@cf/zai-org/glm-4.7-flash`"
             echo "- **Domain:** https://voidone.dpdns.org/"
           } >> "$GITHUB_STEP_SUMMARY"
