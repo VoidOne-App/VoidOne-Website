@@ -285,10 +285,17 @@ jobs:
             node --check "$file"
           done < <(find site/js -type f -name '*.js' -print0)
           node --check src/worker.js
+          node --check site/sw.js
           if [[ -f scripts/sync-downloads.mjs ]]; then
             node --check scripts/sync-downloads.mjs
           fi
           echo 'JavaScript syntax: OK'
+      - name: Command deck contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/deck-contract.js
+          echo 'Command deck contracts: OK'
       - name: JSON validation and data contracts
         shell: python
         run: |

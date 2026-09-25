@@ -61,7 +61,15 @@ jobs:
             "site/css/pages/home.css"
             "site/js/core/site.js"
             "site/js/api/github.js"
+            "site/js/core/env.js"
+            "site/js/core/hud.js"
+            "site/js/components/palette.js"
             "site/js/components/downloads.js"
+            "site/css/components/hud.css"
+            "site/manifest.webmanifest"
+            "site/offline.html"
+            "site/sw.js"
+            "site/data/search.json"
             "site/data/evolution.json"
             "site/data/project.json"
             "site/data/features.json"
@@ -114,7 +122,15 @@ jobs:
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find site/js src -type f -name '*.js' -print0)
+          node --check site/sw.js
           echo 'JavaScript syntax: OK'
+
+      - name: Command deck contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/deck-contract.js
+          echo 'Command deck contracts: OK'
 
       - name: JSON contracts
         shell: python

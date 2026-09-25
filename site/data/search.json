@@ -1,0 +1,269 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "Home",
+      "url": "/",
+      "text": "Your games, your hardware, your rules — native open-source PC gaming platform.",
+      "keywords": "home start overview hero"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "Platform",
+      "url": "/platform/",
+      "text": "Native C++ core, Qt/QML interface, local SQLite data, player toolkit.",
+      "keywords": "platform architecture features steam saves diagnostics"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "Downloads",
+      "url": "/downloads/",
+      "text": "Official releases, Windows installer, portable package, checksums.",
+      "keywords": "download installer portable release exe zip"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "Developers",
+      "url": "/developers/",
+      "text": "Architecture, build guide, CI/CD, security and contribution workflow.",
+      "keywords": "developers build cmake ci cd security contribute source"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "Project",
+      "url": "/project/",
+      "text": "Manifesto, evolution timeline, roadmap and public development history.",
+      "keywords": "project manifesto evolution roadmap history"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "About",
+      "url": "/about.html",
+      "text": "Why VoidOne exists and the principles behind the project.",
+      "keywords": "about principles why player first"
+    },
+    {
+      "lang": "en",
+      "kind": "page",
+      "title": "FAQ",
+      "url": "/faq.html",
+      "text": "Common questions about VoidOne, releases, privacy and contribution.",
+      "keywords": "faq questions help privacy store"
+    },
+    {
+      "lang": "en",
+      "kind": "section",
+      "title": "Platform architecture",
+      "url": "/#platform",
+      "text": "QML/Qt Quick interface, C++ core and SQLite-backed local persistence.",
+      "keywords": "architecture c++23 qt qml sqlite core native"
+    },
+    {
+      "lang": "en",
+      "kind": "section",
+      "title": "Player toolkit / features",
+      "url": "/#features",
+      "text": "Game library, Steam discovery, save backups, diagnostics, localization, release engineering.",
+      "keywords": "features library steam saves diagnostics localization release"
+    },
+    {
+      "lang": "en",
+      "kind": "section",
+      "title": "Project evolution",
+      "url": "/#evolution",
+      "text": "Milestones read from the versioned project dataset.",
+      "keywords": "evolution timeline milestones history changelog"
+    },
+    {
+      "lang": "en",
+      "kind": "section",
+      "title": "For developers",
+      "url": "/#developers",
+      "text": "Developer hub, build guide, security policy and contribution links.",
+      "keywords": "developers source build security issues"
+    },
+    {
+      "lang": "en",
+      "kind": "section",
+      "title": "Roadmap",
+      "url": "/project/#roadmap",
+      "text": "Repository-driven direction: issues and releases define what comes next.",
+      "keywords": "roadmap next plans future issues"
+    },
+    {
+      "lang": "fa",
+      "kind": "page",
+      "title": "صفحه اصلی",
+      "url": "/fa/",
+      "text": "بازی‌های شما، سخت‌افزار شما، قوانین شما — پلتفرم بومی و متن‌باز بازی.",
+      "keywords": "خانه صفحه اصلی معرفی"
+    },
+    {
+      "lang": "fa",
+      "kind": "page",
+      "title": "دانلود",
+      "url": "/fa/downloads.html",
+      "text": "نسخه‌های رسمی، نصب‌کننده ویندوز، نسخه پرتابل و بررسی اصالت.",
+      "keywords": "دانلود نصب پرتابل نسخه"
+    },
+    {
+      "lang": "fa",
+      "kind": "page",
+      "title": "توسعه‌دهندگان",
+      "url": "/fa/developers.html",
+      "text": "معماری، راهنمای ساخت، CI/CD، امنیت و مشارکت.",
+      "keywords": "توسعه دهندگان معماری ساخت امنیت مشارکت"
+    },
+    {
+      "lang": "fa",
+      "kind": "page",
+      "title": "درباره",
+      "url": "/fa/about.html",
+      "text": "چرا VoidOne وجود دارد و اصول پروژه.",
+      "keywords": "درباره اصول چرا بازیکن"
+    },
+    {
+      "lang": "fa",
+      "kind": "page",
+      "title": "پرسش‌های متداول",
+      "url": "/fa/faq.html",
+      "text": "پرسش‌های رایج درباره نسخه‌ها، حریم خصوصی و مشارکت.",
+      "keywords": "پرسش سوال پاسخ حریم خصوصی"
+    },
+    {
+      "lang": "fa",
+      "kind": "section",
+      "title": "معماری پلتفرم",
+      "url": "/fa/#platform",
+      "text": "رابط QML/Qt Quick، هسته C++ و داده محلی مبتنی بر SQLite.",
+      "keywords": "معماری پلتفرم هسته داده محلی"
+    },
+    {
+      "lang": "fa",
+      "kind": "section",
+      "title": "قابلیت‌ها",
+      "url": "/fa/#features",
+      "text": "کتابخانه بازی، کشف Steam، پشتیبان ذخیره‌ها، عیب‌یابی، بومی‌سازی و مهندسی انتشار.",
+      "keywords": "قابلیت کتابخانه استیم پشتیبان عیب یابی"
+    },
+    {
+      "lang": "fa",
+      "kind": "section",
+      "title": "مسیر پروژه",
+      "url": "/fa/#evolution",
+      "text": "نقاط عطف پروژه از داده نسخه‌بندی‌شده خوانده می‌شود.",
+      "keywords": "مسیر پروژه نقاط عطف تاریخچه"
+    }
+  ],
+  "actions": [
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "copy",
+      "value": "git clone https://github.com/VoidOne-App/VoidOne.git",
+      "title": "Copy clone command",
+      "text": "git clone https://github.com/VoidOne-App/VoidOne.git",
+      "keywords": "clone git copy repository"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "accent",
+      "title": "Cycle accent deck",
+      "text": "Switch the interface accent: cyan, ember, violet or acid.",
+      "keywords": "accent colour theme deck cyan ember violet acid"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "motion",
+      "title": "Toggle motion",
+      "text": "Enable or disable interface animation and canvas effects.",
+      "keywords": "motion animation reduce motion performance"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "manifest",
+      "title": "Copy download manifest URL",
+      "text": "/download/manifest.json — provider-neutral release metadata served by the website worker.",
+      "keywords": "download manifest api json release metadata"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "url",
+      "url": "https://github.com/VoidOne-App/VoidOne/releases",
+      "title": "Open GitHub releases",
+      "text": "Latest VoidOne release assets and notes.",
+      "keywords": "releases github download assets"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "url",
+      "url": "https://github.com/VoidOne-App/VoidOne/blob/main/docs/build.md",
+      "title": "Open build guide",
+      "text": "Requirements, CMake configuration and packaging.",
+      "keywords": "build guide cmake requirements packaging"
+    },
+    {
+      "lang": "en",
+      "kind": "action",
+      "action": "url",
+      "url": "https://github.com/VoidOne-App/VoidOne/issues",
+      "title": "Open issues",
+      "text": "Report a problem or propose an improvement.",
+      "keywords": "issues bug report contribute"
+    },
+    {
+      "lang": "fa",
+      "kind": "action",
+      "action": "copy",
+      "value": "git clone https://github.com/VoidOne-App/VoidOne.git",
+      "title": "کپی دستور clone",
+      "text": "git clone https://github.com/VoidOne-App/VoidOne.git",
+      "keywords": "کلون کپی مخزن"
+    },
+    {
+      "lang": "fa",
+      "kind": "action",
+      "action": "accent",
+      "title": "تغییر رنگ رابط",
+      "text": "تغییر رنگ رابط: آبی، نارنجی، بنفش یا سبز.",
+      "keywords": "رنگ تم رابط"
+    },
+    {
+      "lang": "fa",
+      "kind": "action",
+      "action": "motion",
+      "title": "تغییر وضعیت انیمیشن",
+      "text": "فعال یا غیرفعال کردن انیمیشن‌ها.",
+      "keywords": "انیمیشن حرکت"
+    },
+    {
+      "lang": "fa",
+      "kind": "action",
+      "action": "manifest",
+      "title": "کپی نشانی مانیفست دانلود",
+      "text": "/download/manifest.json — ابرداده انتشار.",
+      "keywords": "مانیفست دانلود ای پی آی"
+    },
+    {
+      "lang": "fa",
+      "kind": "action",
+      "action": "url",
+      "url": "https://github.com/VoidOne-App/VoidOne/releases",
+      "title": "باز کردن نسخه‌های GitHub",
+      "text": "آخرین فایل‌ها و یادداشت‌های انتشار.",
+      "keywords": "نسخه انتشار دانلود"
+    }
+  ]
+}
