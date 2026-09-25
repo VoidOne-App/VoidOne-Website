@@ -35,5 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     text('[data-release-status]', 'VIEW RELEASES');
     text('[data-meta]', 'Release information unavailable');
     link('[data-release-url], [data-installer], [data-portable], [data-download="msi"], [data-download="zip"]', fallback);
+  } finally {
+    document.querySelectorAll('[data-release-panel]').forEach((node) => node.removeAttribute('data-loading'));
   }
 });

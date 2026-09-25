@@ -1,5 +1,58 @@
 [
-  {"date":"2025-10-12","title":"Genesis","description":"VoidOne begins. The public history starts here."},
-  {"date":"2026-08-29","title":"Beta-era engineering","description":"The project reaches a mature development phase with packaging, CI/CD, diagnostics and hardening work visible in its public history."},
-  {"date":"2026-08-30","title":"Hardening","description":"Recent work focuses on reliability, runtime safety and release engineering."}
+  {
+    "date": "2025-10-12",
+    "title": "Genesis",
+    "description": "VoidOne begins. The public history starts here.",
+    "status": "shipped",
+    "tag": "project start"
+  },
+  {
+    "date": "2026-08-18",
+    "title": "v0.0.1-Alfa",
+    "description": "First public release milestone for the native platform.",
+    "status": "shipped",
+    "tag": "release"
+  },
+  {
+    "date": "2026-08-22",
+    "title": "v0.0.1-beta.1",
+    "description": "UI and sidebar work, packaging and documentation improvements.",
+    "status": "shipped",
+    "tag": "release"
+  },
+  {
+    "date": "2026-08-29",
+    "title": "Beta-era engineering",
+    "description": "Packaging, CI/CD, diagnostics and hardening work visible in the public history.",
+    "status": "shipped",
+    "tag": "engineering"
+  },
+  {
+    "date": "2026-08-30",
+    "title": "Hardening",
+    "description": "Reliability, runtime safety and release engineering take priority.",
+    "status": "shipped",
+    "tag": "engineering"
+  },
+  {
+    "date": "2026-09",
+    "title": "Website 3.0 rebuild",
+    "description": "A new information architecture and visual system for the public website.",
+    "status": "shipped",
+    "tag": "website"
+  },
+  {
+    "date": "2026-09",
+    "title": "Command deck",
+    "description": "Command palette, live project telemetry, deck preferences and offline support on the website.",
+    "status": "active",
+    "tag": "website"
+  },
+  {
+    "date": "next",
+    "title": "Repository-driven milestones",
+    "description": "Future milestones are tracked through the repository and releases as they become real.",
+    "status": "next",
+    "tag": "planned"
+  }
 ]

@@ -1,3 +1,15 @@
 :root{
 --bg:#05070a;--bg-soft:#080c12;--surface:#0b111a;--surface-2:#101925;--text:#f4f7fb;--muted:#8b98aa;--cyan:#00eaff;--purple:#9b5cff;--line:rgba(164,183,204,.15);--line-strong:rgba(0,234,255,.35);--glow-cyan:rgba(0,234,255,.16);--glow-purple:rgba(155,92,255,.13);--radius:14px;--max:1180px;--shadow:0 22px 70px rgba(0,0,0,.38)
 }
+:root{
+--accent:var(--cyan);
+--accent-ink:#001014;
+--accent-rgb:0,234,255;
+--dock-bg:rgba(8,12,18,.86);
+--hud-font:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace
+}
+/* Accent decks — the whole interface re-lights from these four tokens. */
+[data-accent="ember"]{--cyan:#ff9d2f;--purple:#ff5c5c;--line-strong:rgba(255,157,47,.38);--glow-cyan:rgba(255,157,47,.16);--glow-purple:rgba(255,92,92,.13);--accent-ink:#1a0c00;--accent-rgb:255,157,47}
+[data-accent="violet"]{--cyan:#b28cff;--purple:#ff5cc8;--line-strong:rgba(178,140,255,.38);--glow-cyan:rgba(178,140,255,.17);--glow-purple:rgba(255,92,200,.13);--accent-ink:#0d0020;--accent-rgb:178,140,255}
+[data-accent="acid"]{--cyan:#7dff5c;--purple:#2fe8b0;--line-strong:rgba(125,255,92,.36);--glow-cyan:rgba(125,255,92,.15);--glow-purple:rgba(47,232,176,.13);--accent-ink:#04170a;--accent-rgb:125,255,92}
+[data-accent="ember"] .button,[data-accent="violet"] .button,[data-accent="acid"] .button{color:var(--accent-ink)}
