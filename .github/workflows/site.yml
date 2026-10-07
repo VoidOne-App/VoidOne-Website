@@ -212,9 +212,10 @@ jobs:
                   failures.append(f'{rel}: missing meta description')
               if not parser.viewport:
                   failures.append(f'{rel}: missing viewport')
-              if path.name != '404.html' and parser.main != 1:
+              is_redirect = parser.redirect_target is not None
+              if path.name != '404.html' and not is_redirect and parser.main != 1:
                   failures.append(f'{rel}: expected one main')
-              if path.name != '404.html' and parser.h1 != 1:
+              if path.name != '404.html' and not is_redirect and parser.h1 != 1:
                   failures.append(f'{rel}: expected one h1')
               if rel == 'site/fa/index.html' and (parser.lang != 'fa' or parser.dir != 'rtl'):
                   failures.append(f'{rel}: expected lang="fa" dir="rtl"')
