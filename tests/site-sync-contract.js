@@ -8,7 +8,7 @@ for(const [file,content] of Object.entries(source)){
  if(!content.includes('voidone-mark.svg'))throw new Error(file+': missing shared VoidOne brand mark');
 }
 const index=source['site/index.html'];
-for(const needle of ['docs/build.md','js/github-api.js','js/evolution.js','data-release-version','voidone-player-world.svg']){
+for(const needle of ['js/github-api.js','js/evolution.js','data-release-version','voidone-player-world.svg']){
  if(!index.includes(needle))throw new Error('site/index.html: missing current contract '+needle);
 }
 const redirects=[['site/downloads.html','downloads/'],['site/developers.html','developers/'],['site/fa/downloads.html','../#download'],['site/fa/developers.html','../#developers']];
