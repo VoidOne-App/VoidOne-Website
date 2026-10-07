@@ -62,6 +62,7 @@ jobs:
             "site/js/core/site.js"
             "site/js/api/github.js"
             "site/js/components/downloads.js"
+            "site/js/components/ai.js"
             "site/data/evolution.json"
             "site/data/project.json"
             "site/data/features.json"
@@ -208,14 +209,27 @@ jobs:
           grep -q '"main": "./src/worker.js"' "$WORKER_CONFIG"
           grep -q '"directory": "./site"' "$WORKER_CONFIG"
           grep -q '"binding": "ASSETS"' "$WORKER_CONFIG"
-          grep -q '"run_worker_first": \["/download/\*"\]' "$WORKER_CONFIG"
+          grep -q '"binding": "AI"' "$WORKER_CONFIG"
+          grep -q '"run_worker_first": \["/download/\*", "/api/\*"]' "$WORKER_CONFIG"
           grep -q '"preview_urls": false' "$WORKER_CONFIG"
           grep -q '"workers_dev": false' "$WORKER_CONFIG"
           if grep -Eq '"r2_buckets"|VOIDONE_DOWNLOADS|voidone-downloads' "$WORKER_CONFIG"; then
             echo '::error::Obsolete R2 configuration is still present.'
             exit 1
           fi
-          echo 'Wrangler configuration: OK (Workers Assets + GitHub Releases)'
+          echo 'Wrangler configuration: OK (Workers Assets + Workers AI + GitHub Releases)'
+
+      - name: Workers AI layer contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "AI_MODEL = '@cf/zai-org/glm-4.7-flash'" src/worker.js
+          grep -q "AI_PREFIX = '/api/ai'" src/worker.js
+          grep -q 'env.AI.run(AI_MODEL' src/worker.js
+          grep -q 'AI_MAX_INPUT_CHARS' src/worker.js
+          grep -q 'AI_RATE_LIMIT' src/worker.js
+          test -f site/js/components/ai.js
+          echo 'Workers AI layer: OK (native Cloudflare Workers AI)'
 
       - name: Download layer contract
         shell: bash
@@ -225,8 +239,8 @@ jobs:
           grep -q 'GITHUB_RELEASES_URL' src/worker.js
           grep -q "name.endsWith('.msi') || name.endsWith('.exe')" src/worker.js
           grep -q "name.toLowerCase().endsWith('.zip')" src/worker.js
-          if grep -Eq 'AI_GATEWAY|AI_DYNAMIC|/api/ai|Voidone_al|VOIDONE_DOWNLOADS|DOWNLOAD_BUCKET_PREFIX' src/worker.js "$WORKER_CONFIG"; then
-            echo '::error::Website still contains removed AI or obsolete R2 wiring.'
+          if grep -Eq 'AI_GATEWAY|AI_DYNAMIC|Voidone_al|VOIDONE_DOWNLOADS|DOWNLOAD_BUCKET_PREFIX' src/worker.js "$WORKER_CONFIG"; then
+            echo '::error::Website contains obsolete AI Gateway or R2 wiring.'
             exit 1
           fi
           echo 'Download layer: OK (GitHub Releases)'
@@ -314,5 +328,6 @@ jobs:
             echo "- **Wrangler:** ${WRANGLER_VERSION}"
             echo "- **Worker:** voidone-website"
             echo "- **Download backend:** GitHub Releases"
+            echo "- **AI:** Cloudflare Workers AI / `@cf/zai-org/glm-4.7-flash`"
             echo "- **Domain:** https://voidone.dpdns.org/"
           } >> "$GITHUB_STEP_SUMMARY"
