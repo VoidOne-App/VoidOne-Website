@@ -170,6 +170,7 @@ jobs:
                   self.images = []
                   self.links = []
                   self.inline_handlers = []
+                  self.redirect_target = None
 
               def handle_starttag(self, tag, attrs):
                   attrs = dict(attrs)
@@ -185,6 +186,8 @@ jobs:
                           self.description = True
                       if name == 'viewport':
                           self.viewport = True
+                      if name == 'refresh' and attrs.get('content'):
+                          self.redirect_target = attrs.get('content')
                   elif tag == 'main':
                       self.main += 1
                   elif tag == 'h1':
