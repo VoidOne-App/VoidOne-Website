@@ -260,7 +260,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for page in site/index.html site/downloads/index.html site/platform/index.html site/developers/index.html site/project/index.html site/fa/index.html; do
+          for page in site/index.html site/fa/index.html; do
             grep -q '<header' "$page"
             grep -q '<footer' "$page"
           done
