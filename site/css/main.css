@@ -22,3 +22,6 @@
 .command-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.18;mix-blend-mode:screen;pointer-events:none}.architecture-art{margin:0 0 28px;border:1px solid var(--line);background:#05090e;overflow:hidden}.architecture-art img{display:block;width:100%;height:auto;opacity:.88}.xp-visual>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5;mix-blend-mode:screen;filter:saturate(.8)}
 @media(max-width:900px){.world-head{grid-template-columns:1fr;gap:25px}.player-world{padding-top:80px;padding-bottom:80px}}
 @media(prefers-reduced-motion:reduce){.world-art img{transition:none}.world-art:hover img{transform:none}}
+
+/* Error surface */
+.error-shell{min-height:100vh;width:min(var(--max),calc(100% - 40px));margin:auto;display:grid;place-content:center;justify-items:start;gap:14px}.error-shell h1{font-size:clamp(52px,9vw,110px);line-height:.86;letter-spacing:-.07em;margin:8px 0}.error-shell p{color:var(--muted);max-width:560px}.error-shell .brand{margin-bottom:20px}.error-shell .button{margin-top:8px}
