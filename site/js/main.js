@@ -1,79 +1,8 @@
-(() => {
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const nav = document.querySelector('.nav');
-  const menuButton = document.querySelector('.menu-toggle');
-  const mobileMenu = document.querySelector('#mobile-menu');
-
-  document.querySelectorAll('a[href^="#"]').forEach((link) => {
-    link.addEventListener('click', (event) => {
-      const selector = link.getAttribute('href');
-      const target = selector && document.querySelector(selector);
-      if (!target) return;
-      event.preventDefault();
-      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-      if (mobileMenu && menuButton) {
-        mobileMenu.hidden = true;
-        menuButton.setAttribute('aria-expanded', 'false');
-      }
-    });
-  });
-
-  if (nav) {
-    const updateNav = () => nav.classList.toggle('scrolled', window.scrollY > 24);
-    updateNav();
-    window.addEventListener('scroll', updateNav, { passive: true });
-  }
-
-  if (menuButton && mobileMenu) {
-    const closeMenu = () => {
-      mobileMenu.hidden = true;
-      menuButton.setAttribute('aria-expanded', 'false');
-      menuButton.setAttribute('aria-label', document.documentElement.dir === 'rtl' ? 'باز کردن ناوبری' : 'Open navigation');
-    };
-    menuButton.addEventListener('click', () => {
-      const open = mobileMenu.hidden;
-      mobileMenu.hidden = !open;
-      menuButton.setAttribute('aria-expanded', String(open));
-      menuButton.setAttribute('aria-label', open ? (document.documentElement.dir === 'rtl' ? 'بستن ناوبری' : 'Close navigation') : (document.documentElement.dir === 'rtl' ? 'باز کردن ناوبری' : 'Open navigation'));
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeMenu();
-    });
-    document.addEventListener('click', (event) => {
-      if (!mobileMenu.hidden && nav && !nav.contains(event.target)) closeMenu();
-    });
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 900) closeMenu();
-    });
-  }
-
-  const isPersian = document.documentElement.dir === 'rtl' || location.pathname.includes('/fa/');
-  const currentPage = location.pathname.split('/').pop() || 'index.html';
-  const languageTarget = isPersian ? `../${currentPage}` : `fa/${currentPage}`;
-  const languageLink = document.createElement('a');
-  languageLink.className = 'button ghost language-link';
-  languageLink.href = languageTarget;
-  languageLink.lang = isPersian ? 'en' : 'fa';
-  languageLink.dir = isPersian ? 'ltr' : 'rtl';
-  languageLink.textContent = isPersian ? 'EN' : 'پارسی';
-  languageLink.setAttribute('aria-label', isPersian ? 'Switch to English' : 'تغییر زبان به پارسی');
-  const navActions = document.querySelector('.nav-actions');
-  if (navActions && !navActions.querySelector('.language-link') && !(isPersian && navActions.querySelector('[lang="en"]'))) navActions.prepend(languageLink);
-
-  if (!reduceMotion) {
-    document.documentElement.classList.add('motion-ready');
-    const revealItems = document.querySelectorAll('.reveal, .timeline-item');
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries, instance) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add('is-visible');
-          instance.unobserve(entry.target);
-        });
-      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-      revealItems.forEach((item) => observer.observe(item));
-    } else {
-      revealItems.forEach((item) => item.classList.add('is-visible'));
-    }
-  }
+(()=>{
+const $=(s,c=document)=>c.querySelector(s);const nav=$('[data-nav]');const menu=$('.menu-toggle');const mobile=$('#mobile-menu');
+const reduce=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+if(!reduce)document.documentElement.classList.add('motion-ready');
+window.addEventListener('scroll',()=>nav?.classList.toggle('scrolled',scrollY>10),{passive:true});
+if(menu&&mobile){const close=()=>{mobile.hidden=true;menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation')};menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));menu.setAttribute('aria-label',open?'Close navigation':'Open navigation');mobile.hidden=!open});mobile.querySelectorAll('a').forEach(a=>a.addEventListener('click',close));window.addEventListener('keydown',e=>{if(e.key==='Escape')close()})}
+const reveal=[...document.querySelectorAll('.reveal')];if(reduce||!('IntersectionObserver' in window)){reveal.forEach(el=>el.classList.add('is-visible'))}else{const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target)}}),{threshold:.08});reveal.forEach(el=>io.observe(el))}
 })();

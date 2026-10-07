@@ -19,6 +19,8 @@ for (const needle of ['og:title', 'og:description', 'og:type', 'theme-color']) {
 
 for (const file of ['site/robots.txt', 'site/sitemap.xml']) {
   if (!fs.existsSync(file)) throw new Error(`Missing ${file}`);
+  const body = fs.readFileSync(file, 'utf8');
+  if (body.includes('voidone-website.mohamemk47.workers.dev')) throw new Error(`${file}: stale workers.dev domain remains`);
 }
 
 console.log(`SEO contract: OK (${pages.length} HTML pages)`);
