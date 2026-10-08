@@ -2,6 +2,7 @@ const DOWNLOAD_PREFIX = '/download/';
 const MANIFEST_PATH = '/download/manifest.json';
 const AI_PREFIX = '/api/ai';
 const STATUS_PATH = '/api/status';
+const HEALTH_PATH = '/api/health';
 const STATUS_CACHE_TTL = 60;
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
@@ -124,6 +125,18 @@ async function redirectToGitHubAsset(relativePath) {
   } catch (_) {
     return null;
   }
+}
+
+function handleHealth(request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  return jsonResponse({
+    schema: 1,
+    status: 'ok',
+    service: 'voidone-website',
+    checked_at: new Date().toISOString()
+  }, 'no-store');
 }
 
 async function buildStatus() {
@@ -303,6 +316,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
+
+    if (url.pathname === HEALTH_PATH) return handleHealth(request);
 
     if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
