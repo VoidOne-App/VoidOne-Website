@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           required=(
             "${WORKER_CONFIG}" "src/worker.js" "site/index.html" "site/404.html"
-            "site/downloads/index.html" "site/developers/index.html" "site/project/index.html" "site/explore/index.html" "site/system/index.html" "site/intelligence/index.html" "site/lab/index.html" "site/player/index.html" "site/player/library/index.html" "site/player/diagnostics/index.html" "site/system/architecture/index.html" "site/system/hardware/index.html" "site/intelligence/ai/index.html" "site/intelligence/translation/index.html" "site/lab/testing/index.html" "site/lab/ci/index.html" "site/developers/build/index.html" "site/developers/contributing/index.html" "site/project/origin/index.html" "site/project/evolution/index.html"
+            "site/downloads/index.html" "site/downloads/releases/index.html" "site/downloads/verify/index.html" "site/developers/index.html" "site/project/index.html" "site/explore/index.html" "site/system/index.html" "site/intelligence/index.html" "site/lab/index.html" "site/player/index.html" "site/player/library/index.html" "site/player/diagnostics/index.html" "site/system/architecture/index.html" "site/system/hardware/index.html" "site/intelligence/ai/index.html" "site/intelligence/translation/index.html" "site/lab/testing/index.html" "site/lab/ci/index.html" "site/developers/build/index.html" "site/developers/contributing/index.html" "site/project/origin/index.html" "site/project/evolution/index.html"
             "site/fa/index.html" "site/_headers" "site/robots.txt" "site/sitemap.xml"
             "site/assets/icons/favicon.svg" "site/assets/icons/voidone-mark.svg"
             "site/assets/images/voidone-player-world.svg" "site/assets/images/voidone-player-hud.svg" "site/assets/images/voidone-system-radar.svg" "site/assets/images/voidone-intelligence-core.svg" "site/assets/images/voidone-test-bench.svg" "site/assets/images/voidone-engine-room.svg" "site/assets/images/voidone-project-atlas.svg" "site/assets/images/voidone-architecture.svg"
@@ -202,7 +202,7 @@ jobs:
 
           urls=(
             "/" "/downloads/" "/developers/" "/project/" "/explore/"
-            "/system/" "/intelligence/" "/lab/" "/player/" "/fa/"
+            "/system/" "/intelligence/" "/lab/" "/player/" "/fa/" "/downloads/releases/" "/downloads/verify/"
             "/404.html" "/robots.txt" "/sitemap.xml" "/download/manifest.json"
           )
           for path in "${urls[@]}"; do
@@ -244,7 +244,7 @@ jobs:
           elif test "$manifest_code" -ge 200 -a "$manifest_code" -lt 300; then
             manifest="$(cat "$manifest_body")"
             echo "$manifest" | grep -q '"release"' || { echo "::error::Manifest missing release"; exit 1; }
-            echo "$manifest" | grep -q '"assets"' || { echo "::error::Manifest missing assets"; exit 1; }
+            echo "$manifest" | grep -q '"platforms"' || { echo "::error::Manifest missing platforms"; exit 1; }
             echo "Production manifest: OK"
           else
             echo "::error::Manifest endpoint returned $manifest_code"
