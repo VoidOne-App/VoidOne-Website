@@ -1,6 +1,8 @@
 const DOWNLOAD_PREFIX = '/download/';
 const MANIFEST_PATH = '/download/manifest.json';
 const AI_PREFIX = '/api/ai';
+const STATUS_PATH = '/api/status';
+const STATUS_CACHE_TTL = 60;
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
 const MANIFEST_CACHE_TTL = 300;
@@ -124,6 +126,68 @@ async function redirectToGitHubAsset(relativePath) {
   }
 }
 
+async function buildStatus() {
+  const headers = {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'VoidOne-Website-Status-Service'
+  };
+  const [repoResponse, releasesResponse, runsResponse] = await Promise.all([
+    fetch(`https://api.github.com/repos/${GITHUB_REPO}`, { headers }),
+    fetch(GITHUB_RELEASES_URL, { headers }),
+    fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=5`, { headers })
+  ]);
+  if (!repoResponse.ok || !releasesResponse.ok || !runsResponse.ok) {
+    throw new Error(`GitHub status upstream unavailable: ${repoResponse.status}/${releasesResponse.status}/${runsResponse.status}`);
+  }
+  const [repo, releases, runs] = await Promise.all([
+    repoResponse.json(), releasesResponse.json(), runsResponse.json()
+  ]);
+  const release = releases.find((item) => !item.draft) || null;
+  const run = runs.workflow_runs?.[0] || null;
+  return {
+    schema: 1,
+    generated_at: new Date().toISOString(),
+    repository: {
+      name: repo.full_name, branch: repo.default_branch,
+      stars: repo.stargazers_count, forks: repo.forks_count,
+      open_issues: repo.open_issues_count, watchers: repo.subscribers_count,
+      pushed_at: repo.pushed_at, url: repo.html_url
+    },
+    release: release ? {
+      version: release.tag_name, name: release.name || release.tag_name,
+      prerelease: Boolean(release.prerelease),
+      published_at: release.published_at, url: release.html_url
+    } : null,
+    ci: run ? {
+      name: run.name, status: run.status, conclusion: run.conclusion,
+      branch: run.head_branch, sha: run.head_sha,
+      updated_at: run.updated_at, url: run.html_url
+    } : null
+  };
+}
+
+async function handleStatus(request, ctx) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  try {
+    const cache = caches.default;
+    const cacheKey = new Request(new URL(STATUS_PATH, request.url).toString(), { method: 'GET' });
+    const cached = await cache.match(cacheKey);
+    if (cached) return request.method === 'HEAD'
+      ? new Response(null, { status: cached.status, headers: cached.headers }) : cached;
+    const response = jsonResponse(await buildStatus(), `public, max-age=${STATUS_CACHE_TTL}, s-maxage=${STATUS_CACHE_TTL}`);
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    return request.method === 'HEAD'
+      ? new Response(null, { status: response.status, headers: response.headers }) : response;
+  } catch (error) {
+    return jsonResponse({
+      schema: 1, error: 'status_unavailable',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, 'no-store', 503);
+  }
+}
+
 function getAiClientIp(request) {
   return request.headers.get('CF-Connecting-IP')
     || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
@@ -239,6 +303,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
+
+    if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
     if (url.pathname === MANIFEST_PATH) {
       return handleManifest(request, ctx);
