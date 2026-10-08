@@ -452,7 +452,12 @@ export default {
     for (const channel of ['stable', 'beta', 'nightly']) {
       if (url.pathname === `${RELEASES_PATH}/${channel}`) return handleChannel(request, ctx, channel);
     }
-    if (url.pathname === `${RELEASES_PATH}/latest`) return handleChannel(request, ctx, 'stable');
+    if (url.pathname === `${RELEASES_PATH}/latest`) {
+      const response = await getCachedReleaseIndex(request, ctx);
+      const index = await response.clone().json();
+      const releases = Object.values(index.channels).flat().sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+      return jsonResponse({ schema: 2, generated_at: index.generated_at, provider: index.provider, latest: releases[0] || null }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+    }
 
     if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
