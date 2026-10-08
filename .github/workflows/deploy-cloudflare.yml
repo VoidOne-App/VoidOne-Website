@@ -170,16 +170,50 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm exec --yes --package="wrangler@${WRANGLER_VERSION}" -- wrangler deploy --config "$WORKER_CONFIG"
+      - name: Deployment metadata
+        run: |
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "worker=voidone-website"
+            echo "domain=https://voidone.dpdns.org/"
+            echo "deployed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > deployment-metadata.txt
+
+      - name: Production smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://voidone.dpdns.org"
+          urls=(
+            "/" "/downloads/" "/developers/" "/project/" "/explore/"
+            "/system/" "/intelligence/" "/lab/" "/player/" "/fa/"
+            "/404.html" "/robots.txt" "/sitemap.xml" "/download/manifest.json"
+          )
+          for path in "${urls[@]}"; do
+            echo "Checking $base$path"
+            code="$(curl -L -sS -o /tmp/voidone-smoke-body -w '%{http_code}' --max-time 20 "$base$path")"
+            case "$path" in
+              "/404.html") test "$code" = "404" || { echo "::error::Expected 404 for $path, got $code"; exit 1; } ;;
+              *) test "$code" -ge 200 -a "$code" -lt 400 || { echo "::error::$path returned $code"; exit 1; } ;;
+            esac
+          done
+          manifest="$(curl -L -sS --fail --max-time 20 "$base/download/manifest.json")"
+          echo "$manifest" | grep -q '"release"' || { echo "::error::Manifest missing release"; exit 1; }
+          echo "$manifest" | grep -q '"assets"' || { echo "::error::Manifest missing assets"; exit 1; }
+          echo "Production smoke test: OK"
+
       - name: Summary
         if: always()
         run: |
           {
-            echo '## VoidOne Website'
+            echo '## VoidOne Website — Production Deployment'
             echo
+            echo "- **Status:** ${{ job.status }}"
             echo "- **Commit:** ${GITHUB_SHA}"
             echo "- **Worker:** voidone-website"
             echo "- **Domain:** https://voidone.dpdns.org/"
-            echo "- **Frontend architecture:** V5 Foundation"
-            echo "- **Download backend:** GitHub Releases"
+            echo "- **Frontend:** V5 Foundation"
+            echo "- **Release backend:** GitHub Releases"
             echo "- **AI:** Cloudflare Workers AI"
+            echo "- **Pipeline:** preflight → validate → dry-run → deploy → smoke test"
           } >> "$GITHUB_STEP_SUMMARY"
