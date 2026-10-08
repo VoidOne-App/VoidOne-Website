@@ -363,20 +363,20 @@ jobs:
         run: |
           from pathlib import Path
           home = Path('site/index.html').read_text(encoding='utf-8')
-          downloads = Path('site/downloads/index.html').read_text(encoding='utf-8')
           api = Path('site/js/release.js').read_text(encoding='utf-8')
+          worker = Path('src/worker.js').read_text(encoding='utf-8')
           checks = {
-              'GitHub release fallback': 'releases?per_page=20' in api,
               'same-origin manifest': '/download/manifest.json' in api,
               'repository': 'VoidOne-App/VoidOne' in api,
-              'latest release selection': '!x.draft' in api,
+              'manifest fallback': 'LATEST RELEASE' in api and 'GitHub Releases' in api,
+              'manifest release application': 'applyRelease({...m.release,platforms:m.platforms})' in api,
               'release version target': 'data-release-version' in home,
+              'release channel target': 'data-release-channel' in home,
               'release status target': 'data-release-status' in home,
               'release date target': 'data-release-date' in home,
               'release link target': 'data-release-url' in home,
               'release module': 'js/release.js' in home,
-              'evolution module': 'js/evolution.js' in home,
-              'player world visual': 'voidone-player-world.svg' in home,
+              'worker manifest route': 'url.pathname === MANIFEST_PATH' in worker,
           }
           bad = [key for key, value in checks.items() if not value]
           if bad:
