@@ -214,14 +214,22 @@ jobs:
             cf_ray="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/{sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers" | tr -d '\r')"
             content_type="$(awk 'BEGIN{IGNORECASE=1} /^content-type:/{sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers" | tr -d '\r')"
             echo "HTTP $code | server=${server:-unknown} | cf-ray=${cf_ray:-none} | content-type=${content_type:-unknown}"
-            if test "$code" = "403"; then
+            if test "$path" = "/404.html"; then
+              if test "$code" = "404"; then
+                echo "404 contract: OK"
+              elif test "$code" = "403"; then
+                echo "::warning::$path returned 403 because Cloudflare challenged the GitHub Actions runner; skipping the edge-only 404 assertion."
+                head -c 500 "$body" | tr '\n' ' ' || true
+                echo
+              else
+                echo "::error::Expected 404 for $path, got $code"
+                exit 1
+              fi
+            elif test "$code" = "403"; then
               echo "::warning::$path returned 403. Cloudflare edge security challenged the GitHub Actions runner; treating this as an edge-check warning."
               head -c 500 "$body" | tr '\n' ' ' || true
               echo
               continue
-            fi
-            if test "$path" = "/404.html"; then
-              test "$code" = "404" || { echo "::error::Expected 404 for $path, got $code"; exit 1; }
             else
               test "$code" -ge 200 -a "$code" -lt 400 || { echo "::error::$path returned $code"; exit 1; }
             fi
