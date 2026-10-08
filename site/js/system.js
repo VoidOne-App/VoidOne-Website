@@ -1,1 +1,24 @@
-const GH='https://api.github.com/repos/VoidOne-App/VoidOne';async function loadSystem(){const h={Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};try{const[a,b]=await Promise.all([fetch(GH,{headers:h}),fetch(GH+'/actions/runs?per_page=10',{headers:h})]);if(!a.ok||!b.ok)throw 0;const r=await a.json(),c=await b.json(),w=c.workflow_runs?.[0];document.querySelector('[data-stars]').textContent=Number(r.stargazers_count||0).toLocaleString();document.querySelector('[data-open-issues]').textContent=Number(r.open_issues_count||0).toLocaleString();if(w){document.querySelector('[data-ci]').textContent=(w.conclusion||w.status).toUpperCase();document.querySelector('[data-ci-detail]').textContent=w.name+' · '+new Date(w.updated_at).toLocaleDateString()}}catch(_){document.querySelector('[data-ci]').textContent='UNAVAILABLE';document.querySelector('[data-ci-detail]').textContent='GitHub API unavailable'}}document.addEventListener('DOMContentLoaded',loadSystem);
+const statusEndpoint='/api/status';
+async function loadSystem(){
+  try{
+    const response=await fetch(statusEndpoint,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!response.ok)throw new Error(response.status);
+    const data=await response.json();
+    const repo=data.repository;
+    const release=data.release;
+    const ci=data.ci;
+    document.querySelector('[data-stars]').textContent=Number(repo?.stars||0).toLocaleString();
+    document.querySelector('[data-open-issues]').textContent=Number(repo?.open_issues||0).toLocaleString();
+    document.querySelector('[data-forks]').textContent=Number(repo?.forks||0).toLocaleString();
+    document.querySelector('[data-release]').textContent=release?.version||'NONE';
+    document.querySelector('[data-ci]').textContent=(ci?.conclusion||ci?.status||'UNKNOWN').toUpperCase();
+    document.querySelector('[data-ci-detail]').textContent=ci?ci.name+' · '+new Date(ci.updated_at).toLocaleString():'No workflow data';
+    document.querySelector('[data-live-stamp]').textContent='LIVE · '+new Date(data.generated_at).toLocaleTimeString();
+  }catch(_){
+    document.querySelector('[data-ci]').textContent='UNAVAILABLE';
+    document.querySelector('[data-ci-detail]').textContent='Status API unavailable';
+    document.querySelector('[data-live-stamp]').textContent='SIGNAL DEGRADED';
+  }
+}
+document.addEventListener('DOMContentLoaded',loadSystem);
+setInterval(loadSystem,60000);
