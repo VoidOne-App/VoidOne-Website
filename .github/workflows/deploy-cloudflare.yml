@@ -214,18 +214,17 @@ jobs:
             cf_ray="$(awk 'BEGIN{IGNORECASE=1} /^cf-ray:/{sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers" | tr -d '\r')"
             content_type="$(awk 'BEGIN{IGNORECASE=1} /^content-type:/{sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers" | tr -d '\r')"
             echo "HTTP $code | server=${server:-unknown} | cf-ray=${cf_ray:-none} | content-type=${content_type:-unknown}"
-            case "$path" in
-              "/404.html") test "$code" = "404" || { echo "::error::Expected 404 for $path, got $code"; exit 1; } ;;
-              *)
-                if test "$code" = "403"; then
-                  echo "::warning::$path returned 403. Cloudflare edge security blocked the GitHub Actions runner; treating this as an edge-check warning because Worker health already passed."
-                  head -c 500 "$body" | tr '\n' ' ' || true
-                  echo
-                  continue
-                fi
-                test "$code" -ge 200 -a "$code" -lt 400 || { echo "::error::$path returned $code"; exit 1; }
-                ;;
-            esac
+            if test "$code" = "403"; then
+              echo "::warning::$path returned 403. Cloudflare edge security challenged the GitHub Actions runner; treating this as an edge-check warning."
+              head -c 500 "$body" | tr '\n' ' ' || true
+              echo
+              continue
+            fi
+            if test "$path" = "/404.html"; then
+              test "$code" = "404" || { echo "::error::Expected 404 for $path, got $code"; exit 1; }
+            else
+              test "$code" -ge 200 -a "$code" -lt 400 || { echo "::error::$path returned $code"; exit 1; }
+            fi
           done
           manifest="$(curl -L -sS --fail --max-time 20 "$base/download/manifest.json")"
           echo "$manifest" | grep -q '"release"' || { echo "::error::Manifest missing release"; exit 1; }
