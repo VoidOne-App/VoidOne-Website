@@ -132,10 +132,11 @@ function releaseChannel(release) {
 }
 
 function normalizeRelease(release) {
+  const channel = releaseChannel(release);
   return {
     version: release.tag_name,
     name: release.name || release.tag_name,
-    channel: releaseChannel(release),
+    channel,
     prerelease: Boolean(release.prerelease),
     published_at: release.published_at,
     created_at: release.created_at,
@@ -143,7 +144,7 @@ function normalizeRelease(release) {
     body: release.body || '',
     assets: release.assets
       .filter((asset) => asset.state === 'uploaded')
-      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(asset.name)}`))
+      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(release.tag_name)}${encodeURIComponent(asset.name)}`))
   };
 }
 
@@ -156,7 +157,10 @@ async function fetchReleases() {
   });
   if (!response.ok) throw new Error(`GitHub releases: ${response.status}`);
   const releases = await response.json();
-  return releases.filter((release) => !release.draft).map(normalizeRelease);
+  return releases
+    .filter((release) => !release.draft && release.published_at)
+    .map(normalizeRelease)
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
 }
 
 async function buildReleaseIndex() {
@@ -212,7 +216,8 @@ async function handleChannel(request, ctx, channel) {
 }
 
 async function buildManifest() {
-  const release = await fetchLatestRelease();
+  const releases = await fetchReleases();
+  const release = releases.find((item) => item.channel === 'stable') || releases[0] || null;
   if (!release) throw new Error('No public release found');
   const normalized = normalizeRelease(release);
   const installer = normalized.assets.find((asset) => asset.type === 'installer') || null;
@@ -270,12 +275,16 @@ async function handleManifest(request, ctx) {
 
 async function redirectToGitHubAsset(relativePath) {
   try {
-    const release = await fetchLatestRelease();
+    const parts = relativePath.split('/').map(decodeURIComponent);
+    const version = parts.length > 1 ? parts[0] : null;
+    const filename = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+    const releases = await fetchReleases();
+    const release = version
+      ? releases.find((item) => item.version === version)
+      : releases.find((item) => item.channel === 'stable') || releases[0];
     if (!release) return null;
-
-    const filename = decodeURIComponent(relativePath);
-    const asset = release.assets.find((item) => item.name === filename);
-    return asset?.browser_download_url || null;
+    const asset = release.assets.find((item) => item.filename === filename);
+    return asset?.github_url || null;
   } catch (_) {
     return null;
   }
