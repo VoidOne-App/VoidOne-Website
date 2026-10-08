@@ -9,15 +9,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: voidone-download-sync
+  group: voidone-release-index
   cancel-in-progress: true
 
 jobs:
-  sync:
-    name: Mirror release artifacts to Cloudflare R2
+  validate:
+    name: Validate GitHub release contract
     runs-on: ubuntu-latest
-    environment: production
-
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -30,17 +28,31 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Sync latest published release to R2
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VOIDONE_R2_BUCKET: voidone-downloads
-        run: node scripts/sync-downloads.mjs
-
-      - name: Verify independent download manifest
-        env:
-          DOWNLOAD_MANIFEST_URL: https://voidone.dpdns.org/download/manifest.json
+      - name: Validate latest published release
         run: |
           set -euo pipefail
-          curl -fsSL "$DOWNLOAD_MANIFEST_URL" -o /tmp/manifest.json
-          node -e "const m=require('/tmp/manifest.json'); if(!m.release?.version || !m.assets?.installer?.url || !m.assets?.portable?.url) process.exit(1); console.log('Download manifest:', m.release.version)"
+          curl -fsSL -H 'Accept: application/vnd.github+json' -H 'User-Agent: VoidOne-Website-release-contract' 'https://api.github.com/repos/VoidOne-App/VoidOne/releases?per_page=20' -o /tmp/releases.json
+          node <<'NODE'
+          const releases = require('/tmp/releases.json');
+          const release = releases.find(r => !r.draft);
+          if (!release) throw new Error('No published VoidOne release found.');
+          const assets = release.assets || [];
+          const installer = assets.find(a => /\.(msi|exe)$/i.test(a.name) && a.state === 'uploaded');
+          const portable = assets.find(a => /\.zip$/i.test(a.name) && a.state === 'uploaded');
+          if (!installer || !portable) throw new Error('Release contract requires MSI/EXE installer and ZIP portable assets.');
+          console.log('Release contract OK:', release.tag_name);
+          console.log('Installer:', installer.name);
+          console.log('Portable:', portable.name);
+          NODE
+
+      - name: Validate public manifest
+        run: |
+          set -euo pipefail
+          curl -fsSL 'https://voidone.dpdns.org/download/manifest.json' -o /tmp/manifest.json
+          node <<'NODE'
+          const m = require('/tmp/manifest.json');
+          if (m.schema !== 2) throw new Error('Expected manifest schema 2.');
+          if (!m.release?.version) throw new Error('Manifest missing release version.');
+          if (!m.platforms?.windows?.installer || !m.platforms?.windows?.portable) throw new Error('Manifest missing Windows assets.');
+          console.log('Manifest contract OK:', m.release.version);
+          NODE
