@@ -10,6 +10,7 @@ const MANIFEST_CACHE_TTL = 300;
 const RELEASES_CACHE_TTL = 120;
 const RELEASES_PATH = '/api/releases';
 const DOWNLOADS_PATH = '/api/downloads';
+const SITE_PATH = '/api/site';
 
 const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 const AI_MAX_INPUT_CHARS = 2000;
@@ -22,7 +23,9 @@ const aiRateBuckets = new Map();
 function sanitizeDownloadPath(pathname) {
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
   if (!relative || relative.includes('..') || relative.startsWith('/')) return null;
-  return relative;
+  const parts = relative.split('/').filter(Boolean);
+  if (parts.length !== 2) return null;
+  return { tag: decodeURIComponent(parts[0]), filename: decodeURIComponent(parts[1]) };
 }
 
 function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 200, extraHeaders = {}) {
@@ -34,6 +37,55 @@ function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 20
       ...extraHeaders
     }
   });
+}
+
+function buildSiteData() {
+  return {
+    schema: 1,
+    generated_at: new Date().toISOString(),
+    project: {
+      name: 'VoidOne',
+      tagline: 'Your Games. Your Hardware. Your AI. Your Rules.',
+      description: 'A free, source-available native PC gaming platform built from the player side.',
+      philosophy: ['player-first','local-first','no ads','evidence-first'],
+      license: 'VoidOne Community License v1.0',
+      status: 'active experimental development'
+    },
+    repository: {
+      full_name: GITHUB_REPO,
+      url: 'https://github.com/VoidOne-App/VoidOne',
+      docs_url: 'https://github.com/VoidOne-App/VoidOne/tree/main/docs',
+      actions_url: 'https://github.com/VoidOne-App/VoidOne/actions',
+      security_url: 'https://github.com/VoidOne-App/VoidOne/security'
+    },
+    architecture: {
+      core: 'C++23',
+      ui: 'Qt / QML',
+      data: 'SQLite',
+      build: 'CMake / Ninja',
+      testing: 'CTest + CI',
+      platform: 'Windows primary / Linux CI / macOS secondary'
+    },
+    community: {
+      discord: 'https://discord.gg/KPWfGvf9VW'
+    },
+    endpoints: {
+      status: STATUS_PATH,
+      releases: RELEASES_PATH,
+      manifest: MANIFEST_PATH,
+      health: HEALTH_PATH
+    }
+  };
+}
+
+function handleSite(request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  const response = jsonResponse(buildSiteData(), 'public, max-age=300, s-maxage=300');
+  return request.method === 'HEAD'
+    ? new Response(null, { status: response.status, headers: response.headers })
+    : response;
 }
 
 async function fetchLatestRelease() {
@@ -82,10 +134,11 @@ function releaseChannel(release) {
 }
 
 function normalizeRelease(release) {
+  const channel = releaseChannel(release);
   return {
     version: release.tag_name,
     name: release.name || release.tag_name,
-    channel: releaseChannel(release),
+    channel,
     prerelease: Boolean(release.prerelease),
     published_at: release.published_at,
     created_at: release.created_at,
@@ -93,7 +146,7 @@ function normalizeRelease(release) {
     body: release.body || '',
     assets: release.assets
       .filter((asset) => asset.state === 'uploaded')
-      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(asset.name)}`))
+      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(release.tag_name)}/${encodeURIComponent(asset.name)}`))
   };
 }
 
@@ -106,7 +159,10 @@ async function fetchReleases() {
   });
   if (!response.ok) throw new Error(`GitHub releases: ${response.status}`);
   const releases = await response.json();
-  return releases.filter((release) => !release.draft).map(normalizeRelease);
+  return releases
+    .filter((release) => !release.draft && release.published_at)
+    .map(normalizeRelease)
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
 }
 
 async function buildReleaseIndex() {
@@ -162,7 +218,8 @@ async function handleChannel(request, ctx, channel) {
 }
 
 async function buildManifest() {
-  const release = await fetchLatestRelease();
+  const releases = await fetchReleases();
+  const release = releases.find((item) => item.channel === 'stable') || releases[0] || null;
   if (!release) throw new Error('No public release found');
   const normalized = normalizeRelease(release);
   const installer = normalized.assets.find((asset) => asset.type === 'installer') || null;
@@ -220,12 +277,16 @@ async function handleManifest(request, ctx) {
 
 async function redirectToGitHubAsset(relativePath) {
   try {
-    const release = await fetchLatestRelease();
+    const parts = relativePath.split('/').map(decodeURIComponent);
+    const version = parts.length > 1 ? parts[0] : null;
+    const filename = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+    const releases = await fetchReleases();
+    const release = version
+      ? releases.find((item) => item.version === version)
+      : releases.find((item) => item.channel === 'stable') || releases[0];
     if (!release) return null;
-
-    const filename = decodeURIComponent(relativePath);
-    const asset = release.assets.find((item) => item.name === filename);
-    return asset?.browser_download_url || null;
+    const asset = release.assets.find((item) => item.filename === filename);
+    return asset?.github_url || null;
   } catch (_) {
     return null;
   }
@@ -422,6 +483,7 @@ export default {
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
     if (url.pathname === HEALTH_PATH) return handleHealth(request);
+  if (url.pathname === SITE_PATH) return handleSite(request);
 
     if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
@@ -467,10 +529,10 @@ export default {
         });
       }
 
-      const relativePath = sanitizeDownloadPath(url.pathname);
-      if (!relativePath) return new Response('Not Found', { status: 404 });
+      const pathInfo = sanitizeDownloadPath(url.pathname);
+      if (!pathInfo) return new Response('Not Found', { status: 404 });
 
-      const upstream = await redirectToGitHubAsset(relativePath);
+      const upstream = await redirectToGitHubAsset(pathInfo);
       if (upstream) return Response.redirect(upstream, 302);
 
       return new Response('Download Not Found', { status: 404 });

@@ -37,11 +37,11 @@ jobs:
           set -euo pipefail
           required=(
             "${WORKER_CONFIG}" "src/worker.js" "site/index.html" "site/404.html"
-            "site/downloads/index.html" "site/downloads/releases/index.html" "site/downloads/verify/index.html" "site/developers/index.html" "site/project/index.html" "site/explore/index.html" "site/system/index.html" "site/intelligence/index.html" "site/lab/index.html" "site/player/index.html" "site/player/library/index.html" "site/player/diagnostics/index.html" "site/system/architecture/index.html" "site/system/hardware/index.html" "site/intelligence/ai/index.html" "site/intelligence/translation/index.html" "site/lab/testing/index.html" "site/lab/ci/index.html" "site/developers/build/index.html" "site/developers/contributing/index.html" "site/project/origin/index.html" "site/project/evolution/index.html"
+            "site/downloads/index.html" "site/downloads/releases/index.html" "site/downloads/verify/index.html" "site/downloads/releases/stable/index.html" "site/downloads/releases/beta/index.html" "site/downloads/releases/nightly/index.html" "site/developers/index.html" "site/project/index.html" "site/explore/index.html" "site/system/index.html" "site/intelligence/index.html" "site/lab/index.html" "site/player/index.html" "site/player/library/index.html" "site/player/diagnostics/index.html" "site/system/architecture/index.html" "site/system/hardware/index.html" "site/intelligence/ai/index.html" "site/intelligence/translation/index.html" "site/lab/testing/index.html" "site/lab/ci/index.html" "site/developers/build/index.html" "site/developers/contributing/index.html" "site/project/origin/index.html" "site/project/evolution/index.html"
             "site/fa/index.html" "site/_headers" "site/robots.txt" "site/sitemap.xml"
             "site/assets/icons/favicon.svg" "site/assets/icons/voidone-mark.svg"
             "site/assets/images/voidone-player-world.svg" "site/assets/images/voidone-player-hud.svg" "site/assets/images/voidone-system-radar.svg" "site/assets/images/voidone-intelligence-core.svg" "site/assets/images/voidone-test-bench.svg" "site/assets/images/voidone-engine-room.svg" "site/assets/images/voidone-project-atlas.svg" "site/assets/images/voidone-architecture.svg"
-            "site/css/app.css" "site/js/app.js" "site/js/release.js" "site/js/evolution.js" "site/js/system.js" "site/js/explore.js" "site/js/ai-demo.js"
+            "site/css/app.css" "site/js/app.js" "site/js/release.js" "site/js/evolution.js" "site/js/system.js" "site/js/explore.js" "site/js/ai-demo.js" "site/js/site-api.js"
             "site/data/evolution.json"
           )
           for file in "${required[@]}"; do test -f "$file" || { echo "::error::Missing $file"; exit 1; }; done
@@ -124,6 +124,8 @@ jobs:
           grep -q "AI_PREFIX = '/api/ai'" src/worker.js
           grep -q "GITHUB_REPO = 'VoidOne-App/VoidOne'" src/worker.js
           grep -q 'GITHUB_RELEASES_URL' src/worker.js
+          grep -q "SITE_PATH = '/api/site'" src/worker.js
+          grep -q "schema: 2" src/worker.js
           echo 'Worker contracts: OK'
 
   dry_run:
