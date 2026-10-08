@@ -84,6 +84,11 @@ jobs:
             site/developers/contributing/index.html
             site/project/origin/index.html
             site/project/evolution/index.html
+            site/downloads/releases/index.html
+            site/downloads/verify/index.html
+            site/downloads/releases/stable/index.html
+            site/downloads/releases/beta/index.html
+            site/downloads/releases/nightly/index.html
             site/fa/index.html
             site/_headers
             site/robots.txt
@@ -320,7 +325,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          package-manager-cache: false
       - name: JavaScript and Worker syntax
         shell: bash
         run: |
@@ -561,7 +565,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          package-manager-cache: false
       - name: Install Wrangler
         shell: bash
         run: |
