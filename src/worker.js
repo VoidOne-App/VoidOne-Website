@@ -46,10 +46,10 @@ function buildSiteData() {
     project: {
       name: 'VoidOne',
       tagline: 'Your Games. Your Hardware. Your AI. Your Rules.',
-      description: 'A native, open-source PC gaming platform built from the player side.',
-      philosophy: ['player-first','local-first','no ads','open source'],
-      license: 'MIT',
-      status: 'active development'
+      description: 'A free, source-available native PC gaming platform built from the player side.',
+      philosophy: ['player-first','local-first','no ads','evidence-first'],
+      license: 'VoidOne Community License v1.0',
+      status: 'active experimental development'
     },
     repository: {
       full_name: GITHUB_REPO,
