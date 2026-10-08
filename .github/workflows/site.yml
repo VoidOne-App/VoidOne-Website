@@ -65,27 +65,42 @@ jobs:
             site/index.html
             site/404.html
             site/downloads/index.html
-            site/platform/index.html
+            site/player/index.html
+            site/explore/index.html
+            site/system/index.html
+            site/intelligence/index.html
+            site/lab/index.html
             site/developers/index.html
             site/project/index.html
+            site/player/library/index.html
+            site/player/diagnostics/index.html
+            site/system/architecture/index.html
+            site/system/hardware/index.html
+            site/intelligence/ai/index.html
+            site/intelligence/translation/index.html
+            site/lab/testing/index.html
+            site/lab/ci/index.html
+            site/developers/build/index.html
+            site/developers/contributing/index.html
+            site/project/origin/index.html
+            site/project/evolution/index.html
             site/fa/index.html
             site/_headers
             site/robots.txt
             site/sitemap.xml
             site/assets/icons/favicon.svg
             site/assets/icons/voidone-mark.svg
-            site/css/core/base.css
-            site/css/core/layout.css
-            site/css/components/nav.css
-            site/css/pages/home.css
-            site/css/pages/downloads.css
-            site/css/pages/platform.css
-            site/css/pages/developers.css
-            site/css/pages/project.css
-            site/css/rtl.css
-            site/js/main.js
-            site/js/github-api.js
+            site/assets/images/voidone-command-grid.svg
+            site/assets/images/voidone-player-world.svg
+            site/assets/images/voidone-architecture.svg
+            site/assets/images/voidone-control.svg
+            site/css/app.css
+            site/js/app.js
+            site/js/release.js
             site/js/evolution.js
+            site/js/system.js
+            site/js/explore.js
+            site/js/ai-demo.js
             site/data/evolution.json
             site/data/project.json
             site/data/features.json
@@ -199,7 +214,32 @@ jobs:
                   self.inline_handlers.extend(key for key in attrs if key.lower().startswith('on'))
 
           failures = []
-          pages = sorted(Path('site').rglob('*.html'))
+          pages = [Path(item) for item in (
+              'site/index.html',
+              'site/404.html',
+              'site/downloads/index.html',
+              'site/player/index.html',
+              'site/explore/index.html',
+              'site/system/index.html',
+              'site/intelligence/index.html',
+              'site/lab/index.html',
+              'site/developers/index.html',
+              'site/project/index.html',
+              'site/player/library/index.html',
+              'site/player/diagnostics/index.html',
+              'site/system/architecture/index.html',
+              'site/system/hardware/index.html',
+              'site/intelligence/ai/index.html',
+              'site/intelligence/translation/index.html',
+              'site/lab/testing/index.html',
+              'site/lab/ci/index.html',
+              'site/developers/build/index.html',
+              'site/developers/contributing/index.html',
+              'site/project/origin/index.html',
+              'site/project/evolution/index.html',
+              'site/fa/index.html',
+              'site/fa/404.html',
+          )]
           for path in pages:
               parser = Parser()
               parser.feed(path.read_text(encoding='utf-8'))
@@ -320,16 +360,17 @@ jobs:
           from pathlib import Path
           home = Path('site/index.html').read_text(encoding='utf-8')
           downloads = Path('site/downloads/index.html').read_text(encoding='utf-8')
-          api = Path('site/js/github-api.js').read_text(encoding='utf-8')
+          api = Path('site/js/release.js').read_text(encoding='utf-8')
           checks = {
               'GitHub release fallback': 'releases?per_page=20' in api,
               'same-origin manifest': '/download/manifest.json' in api,
               'repository': 'VoidOne-App/VoidOne' in api,
-              'latest release selection': '!item.draft' in api,
+              'latest release selection': '!x.draft' in api,
               'release version target': 'data-release-version' in home,
               'release status target': 'data-release-status' in home,
               'release date target': 'data-release-date' in home,
               'release link target': 'data-release-url' in home,
+              'release module': 'js/release.js' in home,
               'evolution module': 'js/evolution.js' in home,
               'player world visual': 'voidone-player-world.svg' in home,
           }
@@ -489,7 +530,7 @@ jobs:
               'release endpoint': 'releases?per_page=20' in worker,
               'asset redirect': 'browser_download_url' in worker,
               'manifest endpoint': '/download/manifest.json' in worker,
-              'downloads route': 'url=../#download' in downloads,
+              'downloads release targets': 'data-installer' in downloads and 'data-portable' in downloads,
           }
           bad = [key for key, value in checks.items() if not value]
           if bad:
@@ -499,8 +540,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "catch" site/js/github-api.js
-          grep -q "GitHub Releases" site/js/github-api.js
+          grep -q "catch" site/js/release.js
+          grep -q "GitHub Releases" site/js/release.js
           grep -q "download_manifest_unavailable" src/worker.js
           echo 'API failure handling: OK'
 

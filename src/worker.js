@@ -1,4 +1,5 @@
 const DOWNLOAD_PREFIX = '/download/';
+const MANIFEST_PATH = '/download/manifest.json';
 const AI_PREFIX = '/api/ai';
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
@@ -82,7 +83,7 @@ async function buildManifest() {
 
 async function getCachedManifest(request, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request(new URL(`${DOWNLOAD_PREFIX}manifest.json`, request.url).toString(), { method: 'GET' });
+  const cacheKey = new Request(new URL(MANIFEST_PATH, request.url).toString(), { method: 'GET' });
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
@@ -239,7 +240,7 @@ export default {
 
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
-    if (url.pathname === `${DOWNLOAD_PREFIX}manifest.json`) {
+    if (url.pathname === MANIFEST_PATH) {
       return handleManifest(request, ctx);
     }
 
