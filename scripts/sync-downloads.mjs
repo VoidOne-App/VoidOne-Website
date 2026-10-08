@@ -38,15 +38,18 @@ const releases = await response.json();
 const release = releases.find((item) => !item.draft);
 if (!release) throw new Error('No published VoidOne release found.');
 
-const installer = release.assets?.find((asset) => asset.name.endsWith('.exe') && asset.state === 'uploaded');
+const installer = release.assets?.find((asset) => /\.(msi|exe)$/i.test(asset.name) && asset.state === 'uploaded');
 const portable = release.assets?.find((asset) => asset.name.endsWith('.zip') && asset.state === 'uploaded');
-if (!installer || !portable) throw new Error('Release does not contain both EXE and ZIP assets.');
+if (!installer || !portable) throw new Error('Release does not contain both MSI/EXE installer and ZIP portable assets.');
+
+const installerExt = installer.name.toLowerCase().endsWith('.msi') ? 'msi' : 'exe';
+const installerPath = `.download-sync/installer.${installerExt}`;
 
 await mkdir('.download-sync', { recursive: true });
-await download(installer.browser_download_url, '.download-sync/installer.exe');
+await download(installer.browser_download_url, installerPath);
 await download(portable.browser_download_url, '.download-sync/portable.zip');
 
-const installerBytes = (await readFile('.download-sync/installer.exe')).byteLength;
+const installerBytes = (await readFile(installerPath)).byteLength;
 const portableBytes = (await readFile('.download-sync/portable.zip')).byteLength;
 const version = release.tag_name || 'unknown';
 
@@ -66,7 +69,7 @@ const manifest = {
       url: `/download/windows/${version}/${encodeURIComponent(installer.name)}`,
       size: installerBytes,
       size_label: sizeLabel(installerBytes),
-      sha256: await sha256('.download-sync/installer.exe')
+      sha256: await sha256(installerPath)
     },
     portable: {
       filename: portable.name,
@@ -92,7 +95,7 @@ async function put(key, file, contentType, disposition, cacheControl = 'public, 
   ], { env: process.env });
 }
 
-await put(`releases/${version}/${installer.name}`, '.download-sync/installer.exe', 'application/vnd.microsoft.portable-executable', `attachment; filename="${installer.name}"`);
+await put(`releases/${version}/${installer.name}`, installerPath, installerExt === 'msi' ? 'application/octet-stream' : 'application/vnd.microsoft.portable-executable', `attachment; filename="${installer.name}"`);
 await put(`releases/${version}/${portable.name}`, '.download-sync/portable.zip', 'application/zip', `attachment; filename="${portable.name}"`);
 await put('releases/manifest.json', '.download-sync/manifest.json', 'application/json; charset=utf-8', 'inline', 'no-store');
 
