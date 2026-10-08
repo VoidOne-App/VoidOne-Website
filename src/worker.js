@@ -10,6 +10,7 @@ const MANIFEST_CACHE_TTL = 300;
 const RELEASES_CACHE_TTL = 120;
 const RELEASES_PATH = '/api/releases';
 const DOWNLOADS_PATH = '/api/downloads';
+const SITE_PATH = '/api/site';
 
 const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 const AI_MAX_INPUT_CHARS = 2000;
@@ -34,6 +35,55 @@ function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 20
       ...extraHeaders
     }
   });
+}
+
+function buildSiteData() {
+  return {
+    schema: 1,
+    generated_at: new Date().toISOString(),
+    project: {
+      name: 'VoidOne',
+      tagline: 'Your Games. Your Hardware. Your AI. Your Rules.',
+      description: 'A native, open-source PC gaming platform built from the player side.',
+      philosophy: ['player-first','local-first','no ads','open source'],
+      license: 'MIT',
+      status: 'active development'
+    },
+    repository: {
+      full_name: GITHUB_REPO,
+      url: 'https://github.com/VoidOne-App/VoidOne',
+      docs_url: 'https://github.com/VoidOne-App/VoidOne/tree/main/docs',
+      actions_url: 'https://github.com/VoidOne-App/VoidOne/actions',
+      security_url: 'https://github.com/VoidOne-App/VoidOne/security'
+    },
+    architecture: {
+      core: 'C++23',
+      ui: 'Qt / QML',
+      data: 'SQLite',
+      build: 'CMake / Ninja',
+      testing: 'CTest + CI',
+      platform: 'Windows primary / Linux CI / macOS secondary'
+    },
+    community: {
+      discord: 'https://discord.gg/KPWfGvf9VW'
+    },
+    endpoints: {
+      status: STATUS_PATH,
+      releases: RELEASES_PATH,
+      manifest: MANIFEST_PATH,
+      health: HEALTH_PATH
+    }
+  };
+}
+
+function handleSite(request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  const response = jsonResponse(buildSiteData(), 'public, max-age=300, s-maxage=300');
+  return request.method === 'HEAD'
+    ? new Response(null, { status: response.status, headers: response.headers })
+    : response;
 }
 
 async function fetchLatestRelease() {
@@ -422,6 +472,7 @@ export default {
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
     if (url.pathname === HEALTH_PATH) return handleHealth(request);
+  if (url.pathname === SITE_PATH) return handleSite(request);
 
     if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
