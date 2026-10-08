@@ -23,7 +23,9 @@ const aiRateBuckets = new Map();
 function sanitizeDownloadPath(pathname) {
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
   if (!relative || relative.includes('..') || relative.startsWith('/')) return null;
-  return relative;
+  const parts = relative.split('/').filter(Boolean);
+  if (parts.length !== 2) return null;
+  return { tag: decodeURIComponent(parts[0]), filename: decodeURIComponent(parts[1]) };
 }
 
 function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 200, extraHeaders = {}) {
@@ -527,10 +529,10 @@ export default {
         });
       }
 
-      const relativePath = sanitizeDownloadPath(url.pathname);
-      if (!relativePath) return new Response('Not Found', { status: 404 });
+      const pathInfo = sanitizeDownloadPath(url.pathname);
+      if (!pathInfo) return new Response('Not Found', { status: 404 });
 
-      const upstream = await redirectToGitHubAsset(relativePath);
+      const upstream = await redirectToGitHubAsset(pathInfo);
       if (upstream) return Response.redirect(upstream, 302);
 
       return new Response('Download Not Found', { status: 404 });
