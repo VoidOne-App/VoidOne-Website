@@ -65,6 +65,7 @@ jobs:
             site/index.html
             site/404.html
             site/downloads/index.html
+            site/player/index.html
             site/explore/index.html
             site/system/index.html
             site/intelligence/index.html
@@ -205,6 +206,7 @@ jobs:
               'site/index.html',
               'site/404.html',
               'site/downloads/index.html',
+              'site/player/index.html',
               'site/explore/index.html',
               'site/system/index.html',
               'site/intelligence/index.html',
