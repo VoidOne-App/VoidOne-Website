@@ -7,6 +7,9 @@ const STATUS_CACHE_TTL = 60;
 const GITHUB_REPO = 'VoidOne-App/VoidOne';
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`;
 const MANIFEST_CACHE_TTL = 300;
+const RELEASES_CACHE_TTL = 120;
+const RELEASES_PATH = '/api/releases';
+const DOWNLOADS_PATH = '/api/downloads';
 
 const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 const AI_MAX_INPUT_CHARS = 2000;
@@ -47,39 +50,140 @@ async function fetchLatestRelease() {
   return releases.find((release) => !release.draft) || null;
 }
 
+function assetType(asset) {
+  const name = asset.name.toLowerCase();
+  if (name.endsWith('.msi') || name.endsWith('.exe')) return 'installer';
+  if (name.endsWith('.zip')) return 'portable';
+  return 'other';
+}
+
+function assetDigest(asset) {
+  const digest = typeof asset.digest === 'string' ? asset.digest : '';
+  return digest.startsWith('sha256:') ? digest.slice(7) : null;
+}
+
 function toAsset(asset, url) {
   return {
     filename: asset.name,
+    type: assetType(asset),
     size: asset.size,
     size_label: `${(asset.size / 1024 / 1024).toFixed(1)} MB`,
-    url
+    sha256: assetDigest(asset),
+    url,
+    github_url: asset.browser_download_url
   };
+}
+
+function releaseChannel(release) {
+  const tag = String(release.tag_name || '').toLowerCase();
+  if (tag.includes('nightly') || tag.includes('snapshot')) return 'nightly';
+  if (release.prerelease || tag.includes('beta') || tag.includes('alpha') || tag.includes('rc')) return 'beta';
+  return 'stable';
+}
+
+function normalizeRelease(release) {
+  return {
+    version: release.tag_name,
+    name: release.name || release.tag_name,
+    channel: releaseChannel(release),
+    prerelease: Boolean(release.prerelease),
+    published_at: release.published_at,
+    created_at: release.created_at,
+    notes_url: release.html_url,
+    body: release.body || '',
+    assets: release.assets
+      .filter((asset) => asset.state === 'uploaded')
+      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(asset.name)}`))
+  };
+}
+
+async function fetchReleases() {
+  const response = await fetch(GITHUB_RELEASES_URL, {
+    headers: {
+      accept: 'application/vnd.github+json',
+      'user-agent': 'VoidOne-Website-Release-Service'
+    }
+  });
+  if (!response.ok) throw new Error(`GitHub releases: ${response.status}`);
+  const releases = await response.json();
+  return releases.filter((release) => !release.draft).map(normalizeRelease);
+}
+
+async function buildReleaseIndex() {
+  const releases = await fetchReleases();
+  return {
+    schema: 2,
+    generated_at: new Date().toISOString(),
+    provider: 'github-releases',
+    channels: {
+      stable: releases.filter((release) => release.channel === 'stable'),
+      beta: releases.filter((release) => release.channel === 'beta'),
+      nightly: releases.filter((release) => release.channel === 'nightly')
+    }
+  };
+}
+
+async function getCachedReleaseIndex(request, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(RELEASES_PATH, request.url).toString(), { method: 'GET' });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+  const response = jsonResponse(await buildReleaseIndex(), `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
+}
+
+async function handleReleases(request, ctx) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  try {
+    const response = await getCachedReleaseIndex(request, ctx);
+    return request.method === 'HEAD'
+      ? new Response(null, { status: response.status, headers: response.headers })
+      : response;
+  } catch (error) {
+    return jsonResponse({ schema: 2, error: 'releases_unavailable' }, 'no-store', 503);
+  }
+}
+
+async function handleChannel(request, ctx, channel) {
+  const response = await getCachedReleaseIndex(request, ctx);
+  const index = await response.clone().json();
+  const releases = index.channels[channel] || [];
+  return jsonResponse({
+    schema: 2,
+    generated_at: index.generated_at,
+    provider: index.provider,
+    channel,
+    latest: releases[0] || null,
+    releases
+  }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
 }
 
 async function buildManifest() {
   const release = await fetchLatestRelease();
   if (!release) throw new Error('No public release found');
-
-  const installer = release.assets.find((asset) => {
-    const name = asset.name.toLowerCase();
-    return name.endsWith('.msi') || name.endsWith('.exe');
-  });
-  const portable = release.assets.find((asset) => asset.name.toLowerCase().endsWith('.zip'));
-
+  const normalized = normalizeRelease(release);
+  const installer = normalized.assets.find((asset) => asset.type === 'installer') || null;
+  const portable = normalized.assets.find((asset) => asset.type === 'portable') || null;
   return {
-    schema: 1,
+    schema: 2,
     generated_at: new Date().toISOString(),
     provider: 'github-releases',
     release: {
-      version: release.tag_name,
-      name: release.name || release.tag_name,
-      prerelease: Boolean(release.prerelease),
-      published_at: release.published_at,
-      notes_url: release.html_url
+      version: normalized.version,
+      name: normalized.name,
+      channel: normalized.channel,
+      prerelease: normalized.prerelease,
+      published_at: normalized.published_at,
+      notes_url: normalized.notes_url
     },
-    assets: {
-      installer: installer ? toAsset(installer, `${DOWNLOAD_PREFIX}${encodeURIComponent(installer.name)}`) : null,
-      portable: portable ? toAsset(portable, `${DOWNLOAD_PREFIX}${encodeURIComponent(portable.name)}`) : null
+    platforms: {
+      windows: {
+        installer,
+        portable
+      }
     }
   };
 }
@@ -324,6 +428,31 @@ export default {
     if (url.pathname === MANIFEST_PATH) {
       return handleManifest(request, ctx);
     }
+
+    if (url.pathname === RELEASES_PATH) return handleReleases(request, ctx);
+
+    if (url.pathname === DOWNLOADS_PATH) {
+      const response = await getCachedReleaseIndex(request, ctx);
+      const index = await response.clone().json();
+      const releases = Object.values(index.channels).flat();
+      const assets = releases.flatMap((release) => release.assets.map((asset) => ({
+        ...asset,
+        version: release.version,
+        channel: release.channel,
+        release_url: release.notes_url
+      })));
+      return jsonResponse({
+        schema: 2,
+        generated_at: index.generated_at,
+        provider: index.provider,
+        assets
+      }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+    }
+
+    for (const channel of ['stable', 'beta', 'nightly']) {
+      if (url.pathname === `${RELEASES_PATH}/${channel}`) return handleChannel(request, ctx, channel);
+    }
+    if (url.pathname === `${RELEASES_PATH}/latest`) return handleChannel(request, ctx, 'stable');
 
     if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
