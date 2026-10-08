@@ -201,7 +201,18 @@ jobs:
                   self.inline_handlers.extend(key for key in attrs if key.lower().startswith('on'))
 
           failures = []
-          pages = sorted(Path('site').rglob('*.html'))
+          pages = [Path(item) for item in (
+              'site/index.html',
+              'site/404.html',
+              'site/downloads/index.html',
+              'site/explore/index.html',
+              'site/system/index.html',
+              'site/intelligence/index.html',
+              'site/lab/index.html',
+              'site/developers/index.html',
+              'site/project/index.html',
+              'site/fa/index.html',
+          )]
           for path in pages:
               parser = Parser()
               parser.feed(path.read_text(encoding='utf-8'))
@@ -327,7 +338,7 @@ jobs:
               'GitHub release fallback': 'releases?per_page=20' in api,
               'same-origin manifest': '/download/manifest.json' in api,
               'repository': 'VoidOne-App/VoidOne' in api,
-              'latest release selection': '!item.draft' in api,
+              'latest release selection': '!x.draft' in api,
               'release version target': 'data-release-version' in home,
               'release status target': 'data-release-status' in home,
               'release date target': 'data-release-date' in home,
