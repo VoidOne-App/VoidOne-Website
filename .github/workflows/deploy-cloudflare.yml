@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           required=(
             "${WORKER_CONFIG}" "src/worker.js" "site/index.html" "site/404.html"
-            "site/downloads/index.html" "site/developers/index.html" "site/project/index.html"
+            "site/downloads/index.html" "site/developers/index.html" "site/project/index.html" "site/explore/index.html" "site/system/index.html" "site/intelligence/index.html" "site/lab/index.html"
             "site/fa/index.html" "site/_headers" "site/robots.txt" "site/sitemap.xml"
             "site/assets/icons/favicon.svg" "site/assets/icons/voidone-mark.svg"
             "site/assets/images/voidone-player-world.svg" "site/assets/images/voidone-architecture.svg"
