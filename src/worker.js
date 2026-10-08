@@ -146,7 +146,7 @@ function normalizeRelease(release) {
     body: release.body || '',
     assets: release.assets
       .filter((asset) => asset.state === 'uploaded')
-      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(release.tag_name)}${encodeURIComponent(asset.name)}`))
+      .map((asset) => toAsset(asset, `${DOWNLOAD_PREFIX}${encodeURIComponent(release.tag_name)}/${encodeURIComponent(asset.name)}`))
   };
 }
 
