@@ -1,0 +1,76 @@
+name: Deploy VoidOne Email Worker
+
+on:
+  pull_request:
+    paths:
+      - "email-worker/**"
+      - ".github/workflows/deploy-email-worker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "email-worker/**"
+      - ".github/workflows/deploy-email-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voidone-email-worker-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test email gateway
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: email-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install
+      - name: Run policy tests
+        run: npm test
+
+  deploy:
+    name: Deploy to Cloudflare Workers
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: email-worker
+    steps:
+      - name: Explain skipped deployment
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (env.CF_API_TOKEN == '' || env.CF_ACCOUNT_ID == '') }}
+        run: |
+          echo "Tests passed, but Cloudflare deployment was skipped."
+          echo "Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository Actions secrets, then rerun this workflow."
+
+      - name: Checkout
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' }}
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' }}
+        run: npm install
+      - name: Deploy Worker (creates it if needed)
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: email-worker
+          command: deploy --config wrangler.jsonc

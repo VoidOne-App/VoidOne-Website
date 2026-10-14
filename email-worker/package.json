@@ -1,0 +1,17 @@
+{
+  "name": "voidone-email-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "deploy": "wrangler deploy --config wrangler.jsonc",
+    "dev": "wrangler dev --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "postal-mime": "2.4.3"
+  },
+  "devDependencies": {
+    "wrangler": "4.132.0"
+  }
+}
