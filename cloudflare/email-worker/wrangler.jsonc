@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "voidone-mail-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-13",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "kv_namespaces": [
+    {
+      "binding": "AUDIT_LOGS",
+      "id": "__AUDIT_KV_NAMESPACE_ID__"
+    }
+  ],
+  "vars": {
+    "MAIL_DOMAIN": "voidone.dpdns.org",
+    "GMAIL_INBOX": "REPLACE_WITH_VERIFIED_GMAIL_ADDRESS",
+    "MAX_MESSAGE_BYTES": "15728640",
+    "MAX_ATTACHMENTS": "10",
+    "MAX_TOTAL_ATTACHMENT_BYTES": "10485760",
+    "BLOCKED_SENDERS": "",
+    "BLOCKED_DOMAINS": "",
+    "SLACK_NOTIFY_ALL": "false"
+  }
+}
