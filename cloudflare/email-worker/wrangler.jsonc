@@ -15,7 +15,7 @@
   ],
   "vars": {
     "MAIL_DOMAIN": "voidone.dpdns.org",
-    "GMAIL_INBOX": "REPLACE_WITH_VERIFIED_GMAIL_ADDRESS",
+    "GMAIL_INBOX": "voidone.support@gmail.com",
     "MAX_MESSAGE_BYTES": "15728640",
     "MAX_ATTACHMENTS": "10",
     "MAX_TOTAL_ATTACHMENT_BYTES": "10485760",
