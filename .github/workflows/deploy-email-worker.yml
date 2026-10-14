@@ -1,0 +1,90 @@
+name: Deploy VoidOne Mail Gateway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare/email-worker/**"
+      - ".github/workflows/deploy-email-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voidone-mail-gateway-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validate and deploy Worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cloudflare/email-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: cloudflare/email-worker
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax check
+        working-directory: cloudflare/email-worker
+        run: npm run check
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Create or reuse audit KV namespace
+        id: kv
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?Add CLOUDFLARE_API_TOKEN in GitHub Actions secrets}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Add CLOUDFLARE_ACCOUNT_ID in GitHub Actions secrets}"
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          TITLE="voidone-mail-gateway-audit"
+          LIST="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100")"
+          ID="$(printf '%s' "$LIST" | jq -r --arg title "$TITLE" '.result[]? | select(.title == $title) | .id' | head -n1)"
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            CREATED="$(curl --fail-with-body --silent --show-error \
+              -X POST "$API" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -n --arg title "$TITLE" '{title:$title}')")"
+            printf '%s' "$CREATED" | jq -e '.success == true' >/dev/null
+            ID="$(printf '%s' "$CREATED" | jq -r '.result.id')"
+          fi
+          test -n "$ID"
+          echo "namespace_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Inject generated KV namespace ID
+        working-directory: cloudflare/email-worker
+        env:
+          KV_NAMESPACE_ID: ${{ steps.kv.outputs.namespace_id }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const path = "wrangler.jsonc";
+            const id = process.env.KV_NAMESPACE_ID;
+            if (!id || !/^[a-f0-9]{32}$/i.test(id)) throw new Error("Invalid KV namespace ID");
+            const text = fs.readFileSync(path, "utf8").replace("__AUDIT_KV_NAMESPACE_ID__", id);
+            if (text.includes("__AUDIT_KV_NAMESPACE_ID__")) throw new Error("KV placeholder was not replaced");
+            fs.writeFileSync(path, text);
+          '
+
+      - name: Deploy Worker
+        working-directory: cloudflare/email-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
