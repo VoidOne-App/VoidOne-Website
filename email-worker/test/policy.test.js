@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
+import emailWorker, {
   attachmentProblem,
   csvSet,
   getLocalPart,
@@ -53,13 +53,10 @@ test("rejects attachment count and total size limits", () => {
   );
 
   assert.equal(
-    attachmentProblem(
-      [{
-        filename: "large.txt",
-        content: new Uint8Array(16)
-      }],
-      { MAX_TOTAL_ATTACHMENT_BYTES: "10" }
-    ),
+    attachmentProblem([{
+      filename: "large.txt",
+      content: new Uint8Array(16)
+    }], { MAX_TOTAL_ATTACHMENT_BYTES: "10" }),
     "attachment_size_limit"
   );
 });
@@ -73,4 +70,73 @@ test("allows ordinary small attachments", () => {
     }]),
     null
   );
+});
+
+function mockMessage(overrides = {}) {
+  const state = { rejected: null, forwardedTo: null, headers: null };
+  const message = {
+    from: "sender@example.net",
+    to: "support@voidone.dpdns.org",
+    canBeForwarded: true,
+    rawSize: 100,
+    raw: "From: sender@example.net\r\nTo: support@voidone.dpdns.org\r\nSubject: Test\r\n\r\nHello",
+    setReject(reason) {
+      state.rejected = reason;
+    },
+    async forward(destination, headers) {
+      state.forwardedTo = destination;
+      state.headers = headers;
+    },
+    ...overrides
+  };
+  return { message, state };
+}
+
+function mockContext() {
+  const tasks = [];
+  return {
+    tasks,
+    ctx: {
+      waitUntil(promise) {
+        tasks.push(promise);
+      }
+    }
+  };
+}
+
+test("rejects with destination_not_configured when no inbox is configured", async () => {
+  const { message, state } = mockMessage();
+  const { ctx, tasks } = mockContext();
+
+  await emailWorker.email(message, {}, ctx);
+  await Promise.all(tasks);
+
+  assert.equal(state.rejected, "destination_not_configured");
+  assert.equal(state.forwardedTo, null);
+});
+
+test("forwards to GMAIL_INBOX when a route-specific inbox is absent", async () => {
+  const { message, state } = mockMessage();
+  const { ctx, tasks } = mockContext();
+
+  await emailWorker.email(message, { GMAIL_INBOX: "team@example.net" }, ctx);
+  await Promise.all(tasks);
+
+  assert.equal(state.rejected, null);
+  assert.equal(state.forwardedTo, "team@example.net");
+  assert.equal(state.headers.get("X-VoidOne-Route"), "support");
+});
+
+test("prefers a route-specific inbox over GMAIL_INBOX", async () => {
+  const { message, state } = mockMessage();
+  const { ctx, tasks } = mockContext();
+
+  await emailWorker.email(message, {
+    GMAIL_INBOX: "general@example.net",
+    SUPPORT_INBOX: "support-team@example.net"
+  }, ctx);
+  await Promise.all(tasks);
+
+  assert.equal(state.rejected, null);
+  assert.equal(state.forwardedTo, "support-team@example.net");
 });

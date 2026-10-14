@@ -29,7 +29,7 @@ The workflow can create the Worker via Wrangler, but it cannot configure your pr
 
 After the first successful deployment, open Cloudflare Dashboard → Workers & Pages → `voidone-email-gateway` → Settings → Variables and Secrets. Add:
 
-- `GMAIL_INBOX`: your verified forwarding destination.
+- `GMAIL_INBOX`: your verified forwarding destination. This is required unless every alias has its own route-specific inbox configured.
 - Optional `SUPPORT_INBOX`, `BUGS_INBOX`, `CONTACT_INBOX`, `INFO_INBOX`, `SECURITY_INBOX`: separate verified destinations. If omitted, the main inbox is used.
 - Optional `BLOCKED_SENDERS`: comma-separated exact email addresses.
 - Optional `BLOCKED_DOMAINS`: comma-separated domains.
@@ -41,6 +41,12 @@ After the first successful deployment, open Cloudflare Dashboard → Workers & P
 - Optional `SLACK_NOTIFY_ALL`: set to `true` to notify on successful forwards too.
 
 Variables are kept across Wrangler deployments. Secrets should be added using Cloudflare's secret manager.
+
+## Troubleshooting
+
+- **Activity log says `destination_not_configured`:** the Worker received the message, but it found no forwarding address. Add `GMAIL_INBOX` with the verified destination address, or configure the matching route-specific variable (for example, `SUPPORT_INBOX` for `support@voidone.dpdns.org`). Save the setting and retry with a new test email.
+- **Activity log says `forward_failed`:** a destination was configured, but Cloudflare failed to forward to it. Check that the address is verified in Email Routing and inspect the Worker logs for the underlying error.
+- **No Worker event appears:** confirm the Email Routing rule's action is **Send to a Worker** and the selected Worker is `voidone-email-gateway`.
 
 ## Optional persistent audit log (KV)
 
@@ -56,7 +62,7 @@ The Worker writes only metadata to KV and sets a 90-day TTL. Restrict access to 
 
 ## Email Routing setup
 
-1. Deploy the Worker and configure `GMAIL_INBOX` first.
+1. Deploy the Worker and configure a forwarding destination first.
 2. In Cloudflare Email Routing, create a rule for each supported address and select **Send to a Worker** → `voidone-email-gateway`.
 3. Verify the destination address.
 4. Ensure Cloudflare Email Routing's MX records are active. Do not leave conflicting InstantNode and Cloudflare Email Routing MX configurations in place.
@@ -73,4 +79,4 @@ npm install
 npm test
 ```
 
-Tests cover routing and policy helpers, not Cloudflare's live email infrastructure. Complete a real end-to-end test only after configuring the Worker and Email Routing.
+Tests cover routing and policy helpers plus the handler's configured/missing-destination behavior. They do not validate Cloudflare's live email infrastructure. Complete a real end-to-end test only after configuring the Worker and Email Routing.
