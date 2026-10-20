@@ -29,11 +29,14 @@ function sanitizeDownloadPath(pathname) {
   try {
     const tag = decodeURIComponent(parts[0]);
     const filename = decodeURIComponent(parts[1]);
+    const hasUnsafePathChar = (value) =>
+      value.includes('/') ||
+      value.includes(String.fromCharCode(92)) ||
+      /[\x00-\x1f\x7f]/.test(value);
     if (
       !tag || !filename ||
       tag === '.' || tag === '..' ||
-      /[\\/\\\\\\u0000-\\u001f\\u007f]/.test(tag) ||
-      /[\\/\\\\\\u0000-\\u001f\\u007f]/.test(filename) ||
+      hasUnsafePathChar(tag) || hasUnsafePathChar(filename) ||
       tag.includes('..') || filename === '.' || filename === '..' || filename.includes('..')
     ) return null;
     return { tag, filename };
