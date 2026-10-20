@@ -21,11 +21,25 @@ const AI_RATE_WINDOW_MS = 5 * 60 * 1000;
 const aiRateBuckets = new Map();
 
 function sanitizeDownloadPath(pathname) {
+  if (!pathname.startsWith(DOWNLOAD_PREFIX)) return null;
   const relative = pathname.slice(DOWNLOAD_PREFIX.length);
-  if (!relative || relative.includes('..') || relative.startsWith('/')) return null;
-  const parts = relative.split('/').filter(Boolean);
-  if (parts.length !== 2) return null;
-  return { tag: decodeURIComponent(parts[0]), filename: decodeURIComponent(parts[1]) };
+  const parts = relative.split('/');
+  if (parts.length !== 2 || parts.some((part) => !part)) return null;
+
+  try {
+    const tag = decodeURIComponent(parts[0]);
+    const filename = decodeURIComponent(parts[1]);
+    if (
+      !tag || !filename ||
+      tag === '.' || tag === '..' ||
+      /[\\/\\\\\\u0000-\\u001f\\u007f]/.test(tag) ||
+      /[\\/\\\\\\u0000-\\u001f\\u007f]/.test(filename) ||
+      tag.includes('..') || filename === '.' || filename === '..' || filename.includes('..')
+    ) return null;
+    return { tag, filename };
+  } catch (_) {
+    return null;
+  }
 }
 
 function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 200, extraHeaders = {}) {
@@ -275,17 +289,13 @@ async function handleManifest(request, ctx) {
   }
 }
 
-async function redirectToGitHubAsset(relativePath) {
+async function redirectToGitHubAsset(pathInfo) {
   try {
-    const parts = relativePath.split('/').map(decodeURIComponent);
-    const version = parts.length > 1 ? parts[0] : null;
-    const filename = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+    if (!pathInfo?.tag || !pathInfo?.filename) return null;
     const releases = await fetchReleases();
-    const release = version
-      ? releases.find((item) => item.version === version)
-      : releases.find((item) => item.channel === 'stable') || releases[0];
+    const release = releases.find((item) => item.version === pathInfo.tag);
     if (!release) return null;
-    const asset = release.assets.find((item) => item.filename === filename);
+    const asset = release.assets.find((item) => item.filename === pathInfo.filename);
     return asset?.github_url || null;
   } catch (_) {
     return null;
