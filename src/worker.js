@@ -270,8 +270,8 @@ async function handleManifest(request, ctx) {
     return jsonResponse({
       schema: 1,
       error: 'download_manifest_unavailable',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, 'no-store');
+      message: 'The download service is temporarily unavailable.'
+    }, 'no-store', 503);
   }
 }
 
@@ -361,7 +361,7 @@ async function handleStatus(request, ctx) {
   } catch (error) {
     return jsonResponse({
       schema: 1, error: 'status_unavailable',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: 'The status service is temporarily unavailable.'
     }, 'no-store', 503);
   }
 }
@@ -375,6 +375,9 @@ function getAiClientIp(request) {
 function checkAiRateLimit(request) {
   const ip = getAiClientIp(request);
   const now = Date.now();
+  for (const [key, entry] of aiRateBuckets) {
+    if (now - entry.startedAt >= AI_RATE_WINDOW_MS) aiRateBuckets.delete(key);
+  }
   const bucket = aiRateBuckets.get(ip);
 
   if (!bucket || now - bucket.startedAt >= AI_RATE_WINDOW_MS) {
@@ -432,9 +435,31 @@ async function handleAi(request, env) {
     );
   }
 
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > 16 * 1024) {
+    return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
+  }
+
   let body;
   try {
-    body = await request.json();
+    const reader = request.body?.getReader();
+    if (!reader) return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > 16 * 1024) {
+        await reader.cancel();
+        return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    body = JSON.parse(new TextDecoder().decode(bytes));
   } catch (_) {
     return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
   }
@@ -471,7 +496,7 @@ async function handleAi(request, env) {
   } catch (error) {
     return jsonResponse({
       error: 'ai_unavailable',
-      message: error instanceof Error ? error.message : 'Workers AI request failed'
+      message: 'The AI service is temporarily unavailable.'
     }, 'no-store', 503, corsHeaders);
   }
 }
@@ -482,8 +507,8 @@ export default {
 
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
-    if (url.pathname === HEALTH_PATH) return handleHealth(request);
-  if (url.pathname === SITE_PATH) return handleSite(request);
+      if (url.pathname === HEALTH_PATH) return handleHealth(request);
+    if (url.pathname === SITE_PATH) return handleSite(request);
 
     if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
