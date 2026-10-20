@@ -87,6 +87,19 @@ for (const [file, target, canonical] of legacyRedirects) {
   if (!content.includes('<link rel="canonical" href="' + canonical + '">')) throw new Error(file + ': canonical target mismatch');
 }
 
+const legacyPersianRedirects = [
+  ['fa/about.html', '/fa/', 'https://voidone.dpdns.org/fa/'],
+  ['fa/developers.html', '/developers/', 'https://voidone.dpdns.org/developers/'],
+  ['fa/downloads.html', '/downloads/', 'https://voidone.dpdns.org/downloads/'],
+  ['fa/faq.html', '/project/', 'https://voidone.dpdns.org/project/']
+];
+for (const [file, target, canonical] of legacyPersianRedirects) {
+  const content = read(file);
+  if (!content.includes('content="0;url=' + target + '"')) throw new Error(file + ': Persian legacy redirect target mismatch');
+  if (!content.includes('href="' + target + '"')) throw new Error(file + ': Persian legacy fallback link mismatch');
+  if (!content.includes('<link rel="canonical" href="' + canonical + '">')) throw new Error(file + ': Persian legacy canonical mismatch');
+}
+
 const project = JSON.parse(read('data/project.json'));
 const features = JSON.parse(read('data/features.json'));
 const evolution = JSON.parse(read('data/evolution.json'));
