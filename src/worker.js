@@ -218,17 +218,27 @@ async function handleReleases(request, ctx) {
 }
 
 async function handleChannel(request, ctx, channel) {
-  const response = await getCachedReleaseIndex(request, ctx);
-  const index = await response.clone().json();
-  const releases = index.channels[channel] || [];
-  return jsonResponse({
-    schema: 2,
-    generated_at: index.generated_at,
-    provider: index.provider,
-    channel,
-    latest: releases[0] || null,
-    releases
-  }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+  }
+  try {
+    const response = await getCachedReleaseIndex(request, ctx);
+    const index = await response.clone().json();
+    const releases = index.channels[channel] || [];
+    const result = jsonResponse({
+      schema: 2,
+      generated_at: index.generated_at,
+      provider: index.provider,
+      channel,
+      latest: releases[0] || null,
+      releases
+    }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+    return request.method === 'HEAD'
+      ? new Response(null, { status: result.status, headers: result.headers })
+      : result;
+  } catch (_) {
+    return jsonResponse({ schema: 2, error: 'releases_unavailable' }, 'no-store', 503);
+  }
 }
 
 async function buildManifest() {
@@ -285,7 +295,7 @@ async function handleManifest(request, ctx) {
       schema: 1,
       error: 'download_manifest_unavailable',
       message: error instanceof Error ? error.message : 'Unknown error'
-    }, 'no-store');
+    }, 'no-store', 503);
   }
 }
 
@@ -522,7 +532,8 @@ export default {
     if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
     if (url.pathname === HEALTH_PATH) return handleHealth(request);
-  if (url.pathname === SITE_PATH) return handleSite(request);
+
+    if (url.pathname === SITE_PATH) return handleSite(request);
 
     if (url.pathname === STATUS_PATH) return handleStatus(request, ctx);
 
@@ -533,31 +544,51 @@ export default {
     if (url.pathname === RELEASES_PATH) return handleReleases(request, ctx);
 
     if (url.pathname === DOWNLOADS_PATH) {
-      const response = await getCachedReleaseIndex(request, ctx);
-      const index = await response.clone().json();
-      const releases = Object.values(index.channels).flat();
-      const assets = releases.flatMap((release) => release.assets.map((asset) => ({
-        ...asset,
-        version: release.version,
-        channel: release.channel,
-        release_url: release.notes_url
-      })));
-      return jsonResponse({
-        schema: 2,
-        generated_at: index.generated_at,
-        provider: index.provider,
-        assets
-      }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+      }
+      try {
+        const response = await getCachedReleaseIndex(request, ctx);
+        const index = await response.clone().json();
+        const releases = Object.values(index.channels).flat();
+        const assets = releases.flatMap((release) => release.assets.map((asset) => ({
+          ...asset,
+          version: release.version,
+          channel: release.channel,
+          release_url: release.notes_url
+        })));
+        const result = jsonResponse({
+          schema: 2,
+          generated_at: index.generated_at,
+          provider: index.provider,
+          assets
+        }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+        return request.method === 'HEAD'
+          ? new Response(null, { status: result.status, headers: result.headers })
+          : result;
+      } catch (_) {
+        return jsonResponse({ schema: 2, error: 'downloads_unavailable' }, 'no-store', 503);
+      }
     }
 
     for (const channel of ['stable', 'beta', 'nightly']) {
       if (url.pathname === `${RELEASES_PATH}/${channel}`) return handleChannel(request, ctx, channel);
     }
     if (url.pathname === `${RELEASES_PATH}/latest`) {
-      const response = await getCachedReleaseIndex(request, ctx);
-      const index = await response.clone().json();
-      const releases = Object.values(index.channels).flat().sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-      return jsonResponse({ schema: 2, generated_at: index.generated_at, provider: index.provider, latest: releases[0] || null }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+      }
+      try {
+        const response = await getCachedReleaseIndex(request, ctx);
+        const index = await response.clone().json();
+        const releases = Object.values(index.channels).flat().sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+        const result = jsonResponse({ schema: 2, generated_at: index.generated_at, provider: index.provider, latest: releases[0] || null }, `public, max-age=${RELEASES_CACHE_TTL}, s-maxage=${RELEASES_CACHE_TTL}`);
+        return request.method === 'HEAD'
+          ? new Response(null, { status: result.status, headers: result.headers })
+          : result;
+      } catch (_) {
+        return jsonResponse({ schema: 2, error: 'releases_unavailable' }, 'no-store', 503);
+      }
     }
 
     if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {
