@@ -22,3 +22,14 @@
 .ai-chat-note{color:var(--muted);font-size:10px;margin:12px 0 0}
 @media(max-width:800px){.ai-chat-shell{grid-template-columns:1fr}.ai-chat-prompts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ai-chat-prompts h3{grid-column:1/-1}.ai-chat-prompts button{margin:0}}
 @media(max-width:520px){.ai-chat-prompts{grid-template-columns:1fr}.ai-chat-form{flex-direction:column}.ai-chat-form button{min-height:44px}.ai-message{max-width:100%}}
+
+/* Mobile navigation fallback for pages that do not ship a toggle button. */
+@media(max-width:900px){
+  .site-header:not(:has([data-menu-button])) .nav{height:auto;flex-wrap:wrap;gap:12px;padding-block:10px}
+  .site-header:not(:has([data-menu-button])) .nav-links{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+}
+@media(max-width:600px){
+  .site-header:not(:has([data-menu-button])) .brand{order:0}
+  .site-header:not(:has([data-menu-button])) .nav-end{order:1;margin-left:auto}
+  .site-header:not(:has([data-menu-button])) .nav-links{order:2;flex-basis:100%;width:100%;justify-content:flex-start;gap:10px 14px;padding:10px 0 4px}
+}
