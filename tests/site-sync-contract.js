@@ -163,19 +163,22 @@ for (const file of htmlFiles) {
   if (source.includes('VoidOne section surface.')) {
     htmlFailures.push(rel + ': placeholder metadata description remains');
   }
-  if (!isErrorPage && !/<link\\s+rel=["']canonical["']\\s+href=["']https:\\/\\/voidone\\.dpdns\\.org\\//i.test(source)) {
+  if (!isErrorPage && (!source.includes('rel="canonical"') || !source.includes('https://voidone.dpdns.org/'))) {
     htmlFailures.push(rel + ': canonical URL is missing');
   }
-  const isRedirect = /<meta\\s+http-equiv=["']refresh["']/i.test(source);
-  if (!isErrorPage && !isRedirect && /<main\\b/i.test(source)) {
-    if (!/<a\\s+class=["']skip["']\\s+href=["']#main["']/i.test(source)) {
+  const isRedirect = source.includes('http-equiv="refresh"');
+  if (!isErrorPage && !isRedirect && source.includes('<main')) {
+    if (!source.includes('class="skip" href="#main"')) {
       htmlFailures.push(rel + ': keyboard skip link is missing');
     }
-    if (!/<main\\b[^>]*\\bid=["']main["']/i.test(source)) {
+    const mainStart = source.indexOf('<main');
+    const mainEnd = source.indexOf('>', mainStart);
+    const mainTag = mainStart >= 0 && mainEnd > mainStart ? source.slice(mainStart, mainEnd + 1) : '';
+    if (!mainTag.includes('id="main"')) {
       htmlFailures.push(rel + ': keyboard skip target is missing');
     }
   }
 }
-if (htmlFailures.length) throw new Error('Whole-site HTML contract failed:\\n' + htmlFailures.join('\\n'));
+if (htmlFailures.length) throw new Error('Whole-site HTML contract failed: ' + htmlFailures.join('; '));
 
 console.log('Site sync contract: OK (' + requiredPages.length + ' required pages, data and local references checked)');
