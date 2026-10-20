@@ -52,6 +52,34 @@ try {
   assert.equal(valid.status, 302, 'valid versioned asset path must redirect');
   assert.equal(valid.headers.get('location'), release.assets[0].browser_download_url);
 
+  const healthHead = await worker.fetch(new Request('https://voidone.dpdns.org/api/health', { method: 'HEAD' }), env, ctx);
+  assert.equal(healthHead.status, 200);
+  assert.equal(await healthHead.text(), '', 'HEAD health responses must not contain a body');
+
+  const aiEnv = { AI: { run: async () => ({ response: 'contract-test answer' }) }, ASSETS: env.ASSETS };
+  const aiUrl = 'https://voidone.dpdns.org/api/ai';
+  const spoofIp = 'contract-test-spoof-' + Date.now();
+  for (let i = 0; i < 10; i++) {
+    const response = await worker.fetch(new Request(aiUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': spoofIp + '-' + i
+      },
+      body: JSON.stringify({ message: 'hello' })
+    }), aiEnv, ctx);
+    assert.equal(response.status, 200, 'AI request within the configured limit should succeed');
+  }
+  const rateLimited = await worker.fetch(new Request(aiUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-forwarded-for': spoofIp + '-eleventh'
+    },
+    body: JSON.stringify({ message: 'hello' })
+  }), aiEnv, ctx);
+  assert.equal(rateLimited.status, 429, 'changing client-supplied X-Forwarded-For must not bypass the per-isolate limiter');
+
   const manifestResponse = await worker.fetch(new Request('https://voidone.dpdns.org/download/manifest.json'), env, ctx);
   assert.equal(manifestResponse.status, 200, 'manifest should be available for published releases');
   const manifest = await manifestResponse.json();
@@ -104,7 +132,7 @@ try {
   assert.equal(failedStatus.error, 'status_unavailable');
   assert.equal('message' in failedStatus, false, 'status API must not leak upstream errors');
 
-  console.log('Worker API/download contract: OK (manifest, latest-release fallback, channel index, hashes, HEAD, path sanitization, method guard, generic upstream errors)');
+  console.log('Worker API/download contract: OK (manifest shape, fallback, hashes, HEAD semantics, path sanitization, method guard, generic errors, AI size/rate controls)');
 } finally {
   globalThis.fetch = originalFetch;
   if (originalCaches === undefined) delete globalThis.caches;
