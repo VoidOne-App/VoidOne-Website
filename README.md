@@ -1,6 +1,6 @@
 # VoidOne Website
 
-Official public website for **VoidOne — an open-source native PC gaming platform built around games, not a store.**
+Official public website for **VoidOne — a source-available native PC gaming platform built around games, not a store.**
 
 ## Structure
 
@@ -40,7 +40,7 @@ Serve the repository with any static HTTP server. No framework or application ba
 
 ## Deployment
 
-The site is designed for Cloudflare Pages. The repository contains only static HTML, CSS, JavaScript and data files, so it can be deployed without a build step.
+The production site is served by a Cloudflare Worker using Workers Static Assets and a `wrangler` configuration. It is not currently deployed as a Cloudflare Pages project. Follow the repository's Wrangler configuration and deployment workflow; do not configure a Pages build unless the deployment architecture changes.
 
 ## Canonical project
 
