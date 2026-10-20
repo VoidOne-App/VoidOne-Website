@@ -43,7 +43,7 @@ const checks = [
   [project.license === 'VoidOne Community License v1.0', 'Project data license is stale'],
   [String(project.description || '').includes('source-available'), 'Project description must say source-available'],
   [Array.isArray(evolution), 'Evolution data must be an array'],
-  [features && typeof features === 'object' && !Array.isArray(features), 'Feature data must be an object']
+  [Array.isArray(features), 'Feature data must be an array']
 ];
 const failures = checks.filter(([ok]) => !ok).map(([, message]) => message);
 if (failures.length) throw new Error(failures.join('\n'));
