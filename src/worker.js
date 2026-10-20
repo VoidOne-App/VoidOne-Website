@@ -339,47 +339,66 @@ function handleHealth(request) {
     : response;
 }
 
+async function fetchGitHubJson(url, headers) {
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) return { ok: false, status: response.status, data: null };
+    return { ok: true, status: response.status, data: await response.json() };
+  } catch (_) {
+    return { ok: false, status: 0, data: null };
+  }
+}
+
 async function buildStatus() {
   const headers = {
     accept: 'application/vnd.github+json',
     'user-agent': 'VoidOne-Website-Status-Service'
   };
-  const [repoResponse, releasesResponse, runsResponse] = await Promise.all([
-    fetch(`https://api.github.com/repos/${GITHUB_REPO}`, { headers }),
-    fetch(GITHUB_RELEASES_URL, { headers }),
-    fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=30&branch=main`, { headers })
+  // Keep each public signal independent: a GitHub Actions API failure must not
+  // erase repository metrics and release information that are still available.
+  const [repoResult, releasesResult, runsResult] = await Promise.all([
+    fetchGitHubJson(`https://api.github.com/repos/${GITHUB_REPO}`, headers),
+    fetchGitHubJson(GITHUB_RELEASES_URL, headers),
+    fetchGitHubJson(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=30&branch=main`, headers)
   ]);
-  if (!repoResponse.ok || !releasesResponse.ok || !runsResponse.ok) {
-    throw new Error(`GitHub status upstream unavailable: ${repoResponse.status}/${releasesResponse.status}/${runsResponse.status}`);
-  }
-  const [repo, releases, runs] = await Promise.all([
-    repoResponse.json(), releasesResponse.json(), runsResponse.json()
-  ]);
-  const release = releases.find((item) => !item.draft) || null;
-  const run = runs.workflow_runs?.find((item) =>
-    item.head_branch === (repo.default_branch || 'main') &&
+  const repo = repoResult.data;
+  const releases = releasesResult.data;
+  const runs = runsResult.data;
+  const release = Array.isArray(releases) ? releases.find((item) => !item.draft) || null : null;
+  const run = Array.isArray(runs?.workflow_runs) ? runs.workflow_runs.find((item) =>
+    item.head_branch === (repo?.default_branch || 'main') &&
     !String(item.name || '').toLowerCase().includes('ai code repair') &&
     !['skipped', 'cancelled'].includes(String(item.conclusion || '').toLowerCase())
-  ) || null;
+  ) || null : null;
+  const repositoryAvailable = repoResult.ok && Boolean(repo?.full_name);
+  const releasesAvailable = releasesResult.ok && Array.isArray(releases);
+  const ciAvailable = runsResult.ok && Array.isArray(runs?.workflow_runs);
+
   return {
     schema: 1,
     generated_at: new Date().toISOString(),
-    repository: {
+    status: repositoryAvailable && releasesAvailable && ciAvailable ? 'ok' : 'degraded',
+    signals: {
+      repository: repositoryAvailable ? 'ok' : 'unavailable',
+      releases: releasesAvailable ? 'ok' : 'unavailable',
+      ci: ciAvailable ? 'ok' : 'unavailable'
+    },
+    repository: repositoryAvailable ? {
       name: repo.full_name, branch: repo.default_branch,
       stars: repo.stargazers_count, forks: repo.forks_count,
       open_issues: repo.open_issues_count, watchers: repo.subscribers_count,
       pushed_at: repo.pushed_at, url: repo.html_url
-    },
-    release: release ? {
+    } : null,
+    release: releasesAvailable ? (release ? {
       version: release.tag_name, name: release.name || release.tag_name,
       prerelease: Boolean(release.prerelease),
       published_at: release.published_at, url: release.html_url
-    } : null,
-    ci: run ? {
+    } : null) : null,
+    ci: ciAvailable ? (run ? {
       name: run.name, status: run.status, conclusion: run.conclusion,
       branch: run.head_branch, sha: run.head_sha,
       updated_at: run.updated_at, url: run.html_url
-    } : null
+    } : null) : null
   };
 }
 
@@ -400,7 +419,12 @@ async function handleStatus(request, ctx) {
   } catch (_) {
     return jsonResponse({
       schema: 1,
-      error: 'status_unavailable'
+      status: 'unavailable',
+      error: 'status_unavailable',
+      signals: { repository: 'unavailable', releases: 'unavailable', ci: 'unavailable' },
+      repository: null,
+      release: null,
+      ci: null
     }, 'no-store', 503);
   }
 }
