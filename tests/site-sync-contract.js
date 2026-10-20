@@ -153,4 +153,29 @@ for (const file of walk(siteRoot)) {
 }
 if (broken.length) throw new Error('Broken local references:\n' + [...new Set(broken)].sort().join('\n'));
 
+// Enforce metadata and keyboard-navigation invariants across every HTML page, including legacy aliases.
+const htmlFiles = walk(siteRoot).filter((file) => path.extname(file).toLowerCase() === '.html');
+const htmlFailures = [];
+for (const file of htmlFiles) {
+  const rel = path.relative(siteRoot, file).split(path.sep).join('/');
+  const source = fs.readFileSync(file, 'utf8');
+  const isErrorPage = rel === '404.html' || rel === 'fa/404.html';
+  if (source.includes('VoidOne section surface.')) {
+    htmlFailures.push(rel + ': placeholder metadata description remains');
+  }
+  if (!isErrorPage && !/<link\\s+rel=["']canonical["']\\s+href=["']https:\\/\\/voidone\\.dpdns\\.org\\//i.test(source)) {
+    htmlFailures.push(rel + ': canonical URL is missing');
+  }
+  const isRedirect = /<meta\\s+http-equiv=["']refresh["']/i.test(source);
+  if (!isErrorPage && !isRedirect && /<main\\b/i.test(source)) {
+    if (!/<a\\s+class=["']skip["']\\s+href=["']#main["']/i.test(source)) {
+      htmlFailures.push(rel + ': keyboard skip link is missing');
+    }
+    if (!/<main\\b[^>]*\\bid=["']main["']/i.test(source)) {
+      htmlFailures.push(rel + ': keyboard skip target is missing');
+    }
+  }
+}
+if (htmlFailures.length) throw new Error('Whole-site HTML contract failed:\\n' + htmlFailures.join('\\n'));
+
 console.log('Site sync contract: OK (' + requiredPages.length + ' required pages, data and local references checked)');
