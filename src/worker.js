@@ -328,12 +328,15 @@ function handleHealth(request) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
   }
-  return jsonResponse({
+  const response = jsonResponse({
     schema: 1,
     status: 'ok',
     service: 'voidone-website',
     checked_at: new Date().toISOString()
   }, 'no-store');
+  return request.method === 'HEAD'
+    ? new Response(null, { status: response.status, headers: response.headers })
+    : response;
 }
 
 async function buildStatus() {
@@ -399,9 +402,9 @@ async function handleStatus(request, ctx) {
 }
 
 function getAiClientIp(request) {
-  return request.headers.get('CF-Connecting-IP')
-    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
-    || 'unknown';
+  // CF-Connecting-IP is set by Cloudflare at this Worker boundary. Do not trust
+  // X-Forwarded-For as a fallback, because a direct client can supply that header.
+  return request.headers.get('CF-Connecting-IP') || 'unknown';
 }
 
 function checkAiRateLimit(request) {
