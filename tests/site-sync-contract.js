@@ -72,6 +72,21 @@ for (const [file, url] of metadataPages) {
   if (!content.includes('<link rel="canonical" href="' + url + '">')) throw new Error(file + ': canonical URL mismatch');
 }
 
+const legacyRedirects = [
+  ['v3/index.html', '/', 'https://voidone.dpdns.org/'],
+  ['v3/developers.html', '/developers/', 'https://voidone.dpdns.org/developers/'],
+  ['v3/downloads.html', '/downloads/', 'https://voidone.dpdns.org/downloads/'],
+  ['v3/platform.html', '/player/', 'https://voidone.dpdns.org/player/'],
+  ['v3/project.html', '/project/', 'https://voidone.dpdns.org/project/'],
+  ['v3/fa/index.html', '/fa/', 'https://voidone.dpdns.org/fa/']
+];
+for (const [file, target, canonical] of legacyRedirects) {
+  const content = read(file);
+  if (!content.includes('content="0;url=' + target + '"')) throw new Error(file + ': redirect target mismatch');
+  if (!content.includes('href="' + target + '"')) throw new Error(file + ': fallback link target mismatch');
+  if (!content.includes('<link rel="canonical" href="' + canonical + '">')) throw new Error(file + ': canonical target mismatch');
+}
+
 const project = JSON.parse(read('data/project.json'));
 const features = JSON.parse(read('data/features.json'));
 const evolution = JSON.parse(read('data/evolution.json'));
