@@ -27,6 +27,9 @@ const persianHome = read('fa/index.html');
 const downloads = read('downloads/index.html');
 const releaseList = read('downloads/releases/index.html');
 const verification = read('downloads/verify/index.html');
+const verifierScript = fs.readFileSync(path.resolve(siteRoot, 'js/verify.js'), 'utf8');
+const english404 = read('404.html');
+const persian404 = read('fa/404.html');
 const project = JSON.parse(read('data/project.json'));
 const features = JSON.parse(read('data/features.json'));
 const evolution = JSON.parse(read('data/evolution.json'));
@@ -39,6 +42,10 @@ const checks = [
   [downloads.includes('/api/releases/latest'), 'Download page advertises the latest-release endpoint'],
   [releaseList.includes('../../js/releases.js'), 'Release list must load its API renderer'],
   [verification.includes('js/verify.js'), 'Download verification page must load verify.js'],
+  [verification.includes('for="file"') && verification.includes('aria-live="polite"'), 'Download verification controls must be labelled and announced'],
+  [!verifierScript.includes('innerHTML'), 'Download verifier must not render release data through innerHTML'],
+  [english404.includes('href="/"') && english404.includes('href="/downloads/"'), 'English 404 links must remain valid at nested missing URLs'],
+  [persian404.includes('href="/fa/"') && persian404.includes('href="/404.html"'), 'Persian 404 links must remain valid at nested missing URLs'],
   [persianHome.includes('<html lang="fa" dir="rtl">'), 'Persian homepage must declare language and RTL direction'],
   [project.license === 'VoidOne Community License v1.0', 'Project data license is stale'],
   [String(project.description || '').includes('source-available'), 'Project description must say source-available'],
