@@ -129,6 +129,10 @@ jobs:
           echo 'Worker contracts: OK'
       - name: Worker download regression tests
         run: node --experimental-default-type=module tests/worker-download-contract.mjs
+      - name: Release API and site consistency contracts
+        run: |
+          node tests/release-api-contract.js
+          node tests/site-sync-contract.js
 
   dry_run:
     name: Cloudflare Dry Run
