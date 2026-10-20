@@ -30,6 +30,28 @@ const verification = read('downloads/verify/index.html');
 const verifierScript = fs.readFileSync(path.resolve(siteRoot, 'js/verify.js'), 'utf8');
 const english404 = read('404.html');
 const persian404 = read('fa/404.html');
+const navigationPages = [
+  'downloads/index.html',
+  'downloads/releases/index.html',
+  'downloads/releases/stable/index.html',
+  'downloads/releases/beta/index.html',
+  'downloads/releases/nightly/index.html',
+  'downloads/verify/index.html',
+  'explore/index.html',
+  'system/index.html',
+  'intelligence/index.html',
+  'lab/index.html',
+  'developers/index.html',
+  'project/index.html',
+  'fa/index.html'
+];
+for (const file of navigationPages) {
+  const content = read(file);
+  if (!content.includes('class="skip" href="#main"')) throw new Error(file + ': missing keyboard skip link');
+  if (!/<main\\b[^>]*id="main"/i.test(content)) throw new Error(file + ': skip link target is missing');
+  if (!/<link\\s+rel="canonical"\\s+href="https:\/\/voidone\\.dpdns\\.org\//i.test(content)) throw new Error(file + ': missing canonical URL');
+}
+
 const project = JSON.parse(read('data/project.json'));
 const features = JSON.parse(read('data/features.json'));
 const evolution = JSON.parse(read('data/evolution.json'));
