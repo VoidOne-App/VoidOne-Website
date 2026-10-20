@@ -127,6 +127,8 @@ jobs:
           grep -q "SITE_PATH = '/api/site'" src/worker.js
           grep -q "schema: 2" src/worker.js
           echo 'Worker contracts: OK'
+      - name: Worker download regression tests
+        run: node --experimental-default-type=module tests/worker-download-contract.mjs
 
   dry_run:
     name: Cloudflare Dry Run
