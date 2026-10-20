@@ -149,6 +149,36 @@ try {
   const wrongMethod = await worker.fetch(new Request('https://voidone.dpdns.org/download/v1.0.0/VoidOne-Setup.exe', { method: 'POST' }), env, ctx);
   assert.equal(wrongMethod.status, 405, 'download endpoint must reject methods other than GET and HEAD');
 
+  // A failing Actions endpoint must not hide healthy repository/release signals.
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url === 'https://api.github.com/repos/VoidOne-App/VoidOne') {
+      return new Response(JSON.stringify({
+        full_name: 'VoidOne-App/VoidOne', default_branch: 'main',
+        stargazers_count: 7, forks_count: 2, open_issues_count: 3,
+        subscribers_count: 4, pushed_at: '2026-10-20T00:00:00Z',
+        html_url: 'https://github.com/VoidOne-App/VoidOne'
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url === 'https://api.github.com/repos/VoidOne-App/VoidOne/releases?per_page=20') {
+      return new Response(JSON.stringify([release]), {
+        status: 200, headers: { 'content-type': 'application/vnd.github+json' }
+      });
+    }
+    if (url.includes('/actions/runs?')) {
+      return new Response('rate limited', { status: 403 });
+    }
+    throw new Error('Unexpected test fetch URL: ' + url);
+  };
+  const partialStatusResponse = await worker.fetch(new Request('https://voidone.dpdns.org/api/status'), env, ctx);
+  assert.equal(partialStatusResponse.status, 200, 'partial upstream failures should not fail the entire status API');
+  const partialStatus = await partialStatusResponse.json();
+  assert.equal(partialStatus.status, 'degraded');
+  assert.equal(partialStatus.repository.stars, 7, 'repository metrics remain available when Actions is rate limited');
+  assert.equal(partialStatus.release.version, release.tag_name, 'release signal remains available when Actions is rate limited');
+  assert.equal(partialStatus.ci, null);
+  assert.equal(partialStatus.signals.ci, 'unavailable');
+
   globalThis.fetch = async () => new Response('upstream internal details must not be exposed', { status: 503 });
   const failedManifestResponse = await worker.fetch(new Request('https://voidone.dpdns.org/download/manifest.json'), env, ctx);
   assert.equal(failedManifestResponse.status, 503);
@@ -157,9 +187,13 @@ try {
   assert.equal('message' in failedManifest, false, 'manifest must not leak upstream errors');
 
   const failedStatusResponse = await worker.fetch(new Request('https://voidone.dpdns.org/api/status'), env, ctx);
-  assert.equal(failedStatusResponse.status, 503);
+  assert.equal(failedStatusResponse.status, 200, 'status endpoint remains reachable when all upstream signals are unavailable');
   const failedStatus = await failedStatusResponse.json();
-  assert.equal(failedStatus.error, 'status_unavailable');
+  assert.equal(failedStatus.status, 'degraded');
+  assert.equal(failedStatus.signals.repository, 'unavailable');
+  assert.equal(failedStatus.signals.releases, 'unavailable');
+  assert.equal(failedStatus.signals.ci, 'unavailable');
+  assert.equal(failedStatus.repository, null);
   assert.equal('message' in failedStatus, false, 'status API must not leak upstream errors');
 
   console.log('Worker API/download contract: OK (manifest shape, fallback, hashes, HEAD semantics, path sanitization, method guard, generic errors, AI size/rate controls)');
