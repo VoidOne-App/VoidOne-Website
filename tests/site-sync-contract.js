@@ -52,6 +52,26 @@ for (const file of navigationPages) {
   if (!/<link\s+rel="canonical"\s+href="https:\/\/voidone\.dpdns\.org\//i.test(content)) throw new Error(file + ': missing canonical URL');
 }
 
+const metadataPages = [
+  ['player/library/index.html', 'https://voidone.dpdns.org/player/library/'],
+  ['player/diagnostics/index.html', 'https://voidone.dpdns.org/player/diagnostics/'],
+  ['system/architecture/index.html', 'https://voidone.dpdns.org/system/architecture/'],
+  ['system/hardware/index.html', 'https://voidone.dpdns.org/system/hardware/'],
+  ['intelligence/ai/index.html', 'https://voidone.dpdns.org/intelligence/ai/'],
+  ['intelligence/translation/index.html', 'https://voidone.dpdns.org/intelligence/translation/'],
+  ['lab/ci/index.html', 'https://voidone.dpdns.org/lab/ci/'],
+  ['lab/testing/index.html', 'https://voidone.dpdns.org/lab/testing/'],
+  ['developers/build/index.html', 'https://voidone.dpdns.org/developers/build/'],
+  ['developers/contributing/index.html', 'https://voidone.dpdns.org/developers/contributing/'],
+  ['project/origin/index.html', 'https://voidone.dpdns.org/project/origin/'],
+  ['project/evolution/index.html', 'https://voidone.dpdns.org/project/evolution/']
+];
+for (const [file, url] of metadataPages) {
+  const content = read(file);
+  if (content.includes('VoidOne section surface.')) throw new Error(file + ': generic placeholder description remains');
+  if (!content.includes('<link rel="canonical" href="' + url + '">')) throw new Error(file + ': canonical URL mismatch');
+}
+
 const project = JSON.parse(read('data/project.json'));
 const features = JSON.parse(read('data/features.json'));
 const evolution = JSON.parse(read('data/evolution.json'));
