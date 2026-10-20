@@ -14,7 +14,7 @@ const SITE_PATH = '/api/site';
 
 const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 const AI_MAX_INPUT_CHARS = 2000;
-const AI_MAX_OUTPUT_TOKENS = 256;
+const AI_MAX_OUTPUT_TOKENS = 384;
 const AI_RATE_LIMIT = 10;
 const AI_RATE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -375,6 +375,9 @@ function getAiClientIp(request) {
 function checkAiRateLimit(request) {
   const ip = getAiClientIp(request);
   const now = Date.now();
+  for (const [key, entry] of aiRateBuckets) {
+    if (now - entry.startedAt >= AI_RATE_WINDOW_MS) aiRateBuckets.delete(key);
+  }
   const bucket = aiRateBuckets.get(ip);
 
   if (!bucket || now - bucket.startedAt >= AI_RATE_WINDOW_MS) {
@@ -432,9 +435,34 @@ async function handleAi(request, env) {
     );
   }
 
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > 16 * 1024) {
+    return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
+  }
+
   let body;
   try {
-    body = await request.json();
+    const reader = request.body?.getReader();
+    if (!reader) return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > 16 * 1024) {
+        await reader.cancel();
+        return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    body = JSON.parse(new TextDecoder().decode(bytes));
   } catch (_) {
     return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
   }
@@ -454,6 +482,7 @@ async function handleAi(request, env) {
     const result = await env.AI.run(AI_MODEL, {
       messages: buildAiMessages(message),
       max_completion_tokens: AI_MAX_OUTPUT_TOKENS,
+      reasoning_effort: 'low',
       temperature: 0.2
     });
 
@@ -471,7 +500,7 @@ async function handleAi(request, env) {
   } catch (error) {
     return jsonResponse({
       error: 'ai_unavailable',
-      message: error instanceof Error ? error.message : 'Workers AI request failed'
+      message: 'The AI service is temporarily unavailable.'
     }, 'no-store', 503, corsHeaders);
   }
 }
