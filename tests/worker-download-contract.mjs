@@ -37,11 +37,34 @@ globalThis.caches = {
 };
 globalThis.fetch = async (input) => {
   const url = String(input);
-  assert.match(url, /^https:\/\/api\.github\.com\/repos\/VoidOne-App\/VoidOne\/releases\?per_page=20$/);
-  return new Response(JSON.stringify([release]), {
-    status: 200,
-    headers: { 'content-type': 'application/vnd.github+json' }
-  });
+  if (url === 'https://api.github.com/repos/VoidOne-App/VoidOne/releases?per_page=20') {
+    return new Response(JSON.stringify([release]), {
+      status: 200,
+      headers: { 'content-type': 'application/vnd.github+json' }
+    });
+  }
+  if (url === 'https://api.github.com/repos/VoidOne-App/VoidOne') {
+    return new Response(JSON.stringify({
+      full_name: 'VoidOne-App/VoidOne',
+      default_branch: 'main',
+      stargazers_count: 7,
+      forks_count: 2,
+      open_issues_count: 3,
+      subscribers_count: 4,
+      pushed_at: '2026-10-20T00:00:00Z',
+      html_url: 'https://github.com/VoidOne-App/VoidOne'
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  if (url === 'https://api.github.com/repos/VoidOne-App/VoidOne/actions/runs?per_page=30&branch=main') {
+    return new Response(JSON.stringify({
+      workflow_runs: [
+        { name: 'VoidOne AI Code Repair', head_branch: 'main', status: 'completed', conclusion: 'skipped', updated_at: '2026-10-20T00:03:00Z', html_url: 'https://example.invalid/skipped' },
+        { name: 'VoidOne CI', head_branch: 'main', status: 'completed', conclusion: 'success', updated_at: '2026-10-20T00:02:00Z', html_url: 'https://example.invalid/ci' },
+        { name: 'VoidOne Full System QA', head_branch: 'main', status: 'completed', conclusion: 'failure', updated_at: '2026-10-20T00:01:00Z', html_url: 'https://example.invalid/qa' }
+      ]
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  throw new Error('Unexpected test fetch URL: ' + url);
 };
 
 try {
@@ -90,6 +113,13 @@ try {
   assert.equal(manifest.platforms.windows.portable.filename, 'VoidOne-Portable.zip');
   assert.equal(manifest.platforms.windows.installer.sha256, 'a'.repeat(64));
   assert.equal(manifest.platforms.windows.portable.sha256, 'b'.repeat(64));
+
+  const statusResponse = await worker.fetch(new Request('https://voidone.dpdns.org/api/status'), env, ctx);
+  assert.equal(statusResponse.status, 200, 'status API should return current repository signals');
+  const statusPayload = await statusResponse.json();
+  assert.equal(statusPayload.ci.name, 'VoidOne CI', 'status API must not select a skipped AI repair workflow');
+  assert.equal(statusPayload.ci.conclusion, 'success');
+  assert.equal(statusPayload.repository.branch, 'main');
 
   const latestResponse = await worker.fetch(new Request('https://voidone.dpdns.org/api/releases/latest'), env, ctx);
   assert.equal(latestResponse.status, 200, 'latest-release fallback endpoint should work');
