@@ -347,7 +347,7 @@ async function buildStatus() {
   const [repoResponse, releasesResponse, runsResponse] = await Promise.all([
     fetch(`https://api.github.com/repos/${GITHUB_REPO}`, { headers }),
     fetch(GITHUB_RELEASES_URL, { headers }),
-    fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=5`, { headers })
+    fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=30&branch=main`, { headers })
   ]);
   if (!repoResponse.ok || !releasesResponse.ok || !runsResponse.ok) {
     throw new Error(`GitHub status upstream unavailable: ${repoResponse.status}/${releasesResponse.status}/${runsResponse.status}`);
@@ -356,7 +356,11 @@ async function buildStatus() {
     repoResponse.json(), releasesResponse.json(), runsResponse.json()
   ]);
   const release = releases.find((item) => !item.draft) || null;
-  const run = runs.workflow_runs?.[0] || null;
+  const run = runs.workflow_runs?.find((item) =>
+    item.head_branch === (repo.default_branch || 'main') &&
+    !String(item.name || '').toLowerCase().includes('ai code repair') &&
+    !['skipped', 'cancelled'].includes(String(item.conclusion || '').toLowerCase())
+  ) || null;
   return {
     schema: 1,
     generated_at: new Date().toISOString(),
