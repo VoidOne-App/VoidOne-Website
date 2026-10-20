@@ -1,9 +1,9 @@
 {
   "name": "VoidOne",
   "tagline": "Your Games. Your Hardware. Your AI. Your Rules.",
-  "description": "A native, open-source PC gaming platform for games you already own.",
+  "description": "A native, source-available PC gaming platform for games you already own.",
   "status": "Active development",
-  "license": "MIT",
+  "license": "VoidOne Community License v1.0",
   "repository": "https://github.com/VoidOne-App/VoidOne",
   "website": "https://voidone.dpdns.org/"
 }
