@@ -48,8 +48,8 @@ const navigationPages = [
 for (const file of navigationPages) {
   const content = read(file);
   if (!content.includes('class="skip" href="#main"')) throw new Error(file + ': missing keyboard skip link');
-  if (!/<main\\b[^>]*id="main"/i.test(content)) throw new Error(file + ': skip link target is missing');
-  if (!/<link\\s+rel="canonical"\\s+href="https:\/\/voidone\\.dpdns\\.org\//i.test(content)) throw new Error(file + ': missing canonical URL');
+  if (!/<main\b[^>]*id="main"/i.test(content)) throw new Error(file + ': skip link target is missing');
+  if (!/<link\s+rel="canonical"\s+href="https:\/\/voidone\.dpdns\.org\//i.test(content)) throw new Error(file + ': missing canonical URL');
 }
 
 const project = JSON.parse(read('data/project.json'));
