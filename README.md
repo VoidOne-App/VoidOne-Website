@@ -1,6 +1,6 @@
 # VoidOne Website
 
-Official public website for **VoidOne — an open-source native PC gaming platform built around games, not a store.**
+Official public website for **VoidOne — a source-available native PC gaming platform built around games, not a store.**
 
 ## Structure
 
