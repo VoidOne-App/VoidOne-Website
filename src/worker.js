@@ -307,10 +307,14 @@ async function handleManifest(request, ctx) {
   }
 }
 
-async function redirectToGitHubAsset(pathInfo) {
+async function redirectToGitHubAsset(request, ctx, pathInfo) {
   try {
     if (!pathInfo?.tag || !pathInfo?.filename) return null;
-    const releases = await fetchReleases();
+    // Reuse the short-lived release index cache instead of calling GitHub for
+    // every individual download request.
+    const response = await getCachedReleaseIndex(request, ctx);
+    const index = await response.json();
+    const releases = Object.values(index.channels || {}).flat();
     const release = releases.find((item) => item.version === pathInfo.tag);
     if (!release) return null;
     const asset = release.assets.find((item) => item.filename === pathInfo.filename);
@@ -610,7 +614,7 @@ export default {
       const pathInfo = sanitizeDownloadPath(url.pathname);
       if (!pathInfo) return new Response('Not Found', { status: 404 });
 
-      const upstream = await redirectToGitHubAsset(pathInfo);
+      const upstream = await redirectToGitHubAsset(request, ctx, pathInfo);
       if (upstream) return Response.redirect(upstream, 302);
 
       return new Response('Download Not Found', { status: 404 });
