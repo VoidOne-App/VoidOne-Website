@@ -77,31 +77,13 @@ try {
 
   const healthHead = await worker.fetch(new Request('https://voidone.dpdns.org/api/health', { method: 'HEAD' }), env, ctx);
   assert.equal(healthHead.status, 200);
+  assert.equal(healthHead.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(healthHead.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
   assert.equal(await healthHead.text(), '', 'HEAD health responses must not contain a body');
 
-  const aiEnv = { AI: { run: async () => ({ response: 'contract-test answer' }) }, ASSETS: env.ASSETS };
-  const aiUrl = 'https://voidone.dpdns.org/api/ai';
-  const spoofIp = 'contract-test-spoof-' + Date.now();
-  for (let i = 0; i < 10; i++) {
-    const response = await worker.fetch(new Request(aiUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-forwarded-for': spoofIp + '-' + i
-      },
-      body: JSON.stringify({ message: 'hello' })
-    }), aiEnv, ctx);
-    assert.equal(response.status, 200, 'AI request within the configured limit should succeed');
-  }
-  const rateLimited = await worker.fetch(new Request(aiUrl, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-forwarded-for': spoofIp + '-eleventh'
-    },
-    body: JSON.stringify({ message: 'hello' })
-  }), aiEnv, ctx);
-  assert.equal(rateLimited.status, 429, 'changing client-supplied X-Forwarded-For must not bypass the per-isolate limiter');
+  const retiredAi = await worker.fetch(new Request('https://voidone.dpdns.org/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'hello' }) }), env, ctx);
+  assert.equal(retiredAi.status, 404, 'removed AI endpoint must not be available');
+  assert.equal((await retiredAi.json()).error, 'not_found');
 
   const manifestResponse = await worker.fetch(new Request('https://voidone.dpdns.org/download/manifest.json'), env, ctx);
   assert.equal(manifestResponse.status, 200, 'manifest should be available for published releases');
@@ -196,7 +178,7 @@ try {
   assert.equal(failedStatus.repository, null);
   assert.equal('message' in failedStatus, false, 'status API must not leak upstream errors');
 
-  console.log('Worker API/download contract: OK (manifest shape, fallback, hashes, HEAD semantics, path sanitization, method guard, generic errors, AI size/rate controls)');
+  console.log('Worker API/download contract: OK (manifest shape, fallback, hashes, HEAD semantics, path sanitization, method guard, generic errors, retired AI endpoint and API security headers)');
 } finally {
   globalThis.fetch = originalFetch;
   if (originalCaches === undefined) delete globalThis.caches;

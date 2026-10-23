@@ -1,6 +1,5 @@
 const DOWNLOAD_PREFIX = '/download/';
 const MANIFEST_PATH = '/download/manifest.json';
-const AI_PREFIX = '/api/ai';
 const STATUS_PATH = '/api/status';
 const HEALTH_PATH = '/api/health';
 const STATUS_CACHE_TTL = 60;
@@ -13,13 +12,6 @@ const RELEASES_LATEST_PATH = `${RELEASES_PATH}/latest`;
 const DOWNLOADS_PATH = '/api/downloads';
 const SITE_PATH = '/api/site';
 
-const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
-const AI_MAX_INPUT_CHARS = 2000;
-const AI_MAX_OUTPUT_TOKENS = 384;
-const AI_RATE_LIMIT = 10;
-const AI_RATE_WINDOW_MS = 5 * 60 * 1000;
-
-const aiRateBuckets = new Map();
 
 function sanitizeDownloadPath(pathname) {
   if (!pathname.startsWith(DOWNLOAD_PREFIX)) return null;
@@ -51,6 +43,12 @@ function jsonResponse(payload, cacheControl = 'public, max-age=300', status = 20
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
+      'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-resource-policy': 'same-origin',
       'cache-control': cacheControl,
       ...extraHeaders
     }
@@ -63,7 +61,7 @@ function buildSiteData() {
     generated_at: new Date().toISOString(),
     project: {
       name: 'VoidOne',
-      tagline: 'Your Games. Your Hardware. Your AI. Your Rules.',
+      tagline: 'Your Games. Your Hardware. Your Rules.',
       description: 'A free, source-available native PC gaming platform built from the player side.',
       philosophy: ['player-first','local-first','no ads','evidence-first'],
       license: 'VoidOne Community License v1.0',
@@ -429,150 +427,9 @@ async function handleStatus(request, ctx) {
   }
 }
 
-function getAiClientIp(request) {
-  // CF-Connecting-IP is set by Cloudflare at this Worker boundary. Do not trust
-  // X-Forwarded-For as a fallback, because a direct client can supply that header.
-  return request.headers.get('CF-Connecting-IP') || 'unknown';
-}
-
-function checkAiRateLimit(request) {
-  const ip = getAiClientIp(request);
-  const now = Date.now();
-  for (const [key, entry] of aiRateBuckets) {
-    if (now - entry.startedAt >= AI_RATE_WINDOW_MS) aiRateBuckets.delete(key);
-  }
-  const bucket = aiRateBuckets.get(ip);
-
-  if (!bucket || now - bucket.startedAt >= AI_RATE_WINDOW_MS) {
-    aiRateBuckets.set(ip, { startedAt: now, count: 1 });
-    return true;
-  }
-
-  if (bucket.count >= AI_RATE_LIMIT) return false;
-  bucket.count += 1;
-  return true;
-}
-
-function buildAiMessages(message) {
-  return [
-    {
-      role: 'system',
-      content: [
-        'You are VoidOne AI, the assistant for the VoidOne native PC gaming platform.',
-        'Help with VoidOne features, installation, releases, documentation, and general troubleshooting.',
-        'Do not invent VoidOne features, release information, or technical facts.',
-        'If you do not know something about VoidOne, say so clearly.',
-        'Keep answers concise and useful.'
-      ].join(' ')
-    },
-    { role: 'user', content: message }
-  ];
-}
-
-function extractAiResponse(result) {
-  if (typeof result === 'string') return result;
-  return result?.choices?.[0]?.message?.content
-    || result?.response
-    || result?.result
-    || result?.output_text
-    || result?.text
-    || '';
-}
-
-async function handleAi(request, env) {
-  const corsHeaders = {
-    'access-control-allow-origin': 'https://voidone.dpdns.org',
-    'access-control-allow-methods': 'POST, OPTIONS',
-    'access-control-allow-headers': 'content-type'
-  };
-
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-  if (request.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 'no-store', 405, corsHeaders);
-
-  if (!checkAiRateLimit(request)) {
-    return jsonResponse(
-      { error: 'rate_limit_exceeded', message: 'Please wait a few minutes before trying again.' },
-      'no-store',
-      429,
-      corsHeaders
-    );
-  }
-
-  const contentLength = Number(request.headers.get('content-length') || 0);
-  if (contentLength > 16 * 1024) {
-    return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
-  }
-
-  let body;
-  try {
-    const reader = request.body?.getReader();
-    if (!reader) return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
-    const chunks = [];
-    let total = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > 16 * 1024) {
-        await reader.cancel();
-        return jsonResponse({ error: 'request_too_large' }, 'no-store', 413, corsHeaders);
-      }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    body = JSON.parse(new TextDecoder().decode(bytes));
-  } catch (_) {
-    return jsonResponse({ error: 'invalid_json' }, 'no-store', 400, corsHeaders);
-  }
-
-  const message = typeof body?.message === 'string' ? body.message.trim() : '';
-  if (!message) return jsonResponse({ error: 'message_required' }, 'no-store', 400, corsHeaders);
-  if (message.length > AI_MAX_INPUT_CHARS) {
-    return jsonResponse(
-      { error: 'message_too_long', max_chars: AI_MAX_INPUT_CHARS },
-      'no-store',
-      413,
-      corsHeaders
-    );
-  }
-
-  try {
-    const result = await env.AI.run(AI_MODEL, {
-      messages: buildAiMessages(message),
-      max_completion_tokens: AI_MAX_OUTPUT_TOKENS,
-      reasoning_effort: 'low',
-      temperature: 0.2
-    });
-
-    const responseText = extractAiResponse(result);
-    if (!responseText) {
-      return jsonResponse({ error: 'empty_ai_response' }, 'no-store', 502, corsHeaders);
-    }
-
-    return jsonResponse(
-      { model: AI_MODEL, response: responseText },
-      'no-store',
-      200,
-      corsHeaders
-    );
-  } catch (error) {
-    return jsonResponse({
-      error: 'ai_unavailable',
-      message: 'The AI service is temporarily unavailable.'
-    }, 'no-store', 503, corsHeaders);
-  }
-}
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
-    if (url.pathname === AI_PREFIX) return handleAi(request, env);
 
     if (url.pathname === HEALTH_PATH) return handleHealth(request);
 
@@ -632,6 +489,10 @@ export default {
       } catch (_) {
         return jsonResponse({ schema: 2, error: 'releases_unavailable' }, 'no-store', 503);
       }
+    }
+
+    if (url.pathname.startsWith('/api/')) {
+      return jsonResponse({ error: 'not_found' }, 'no-store', 404);
     }
 
     if (url.pathname.startsWith(DOWNLOAD_PREFIX)) {

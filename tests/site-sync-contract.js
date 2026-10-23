@@ -11,12 +11,12 @@ const requiredPages = [
   'player/index.html', 'player/library/index.html', 'player/diagnostics/index.html',
   'explore/index.html', 'system/index.html', 'system/architecture/index.html',
   'system/hardware/index.html', 'intelligence/index.html',
-  'intelligence/ai/index.html', 'intelligence/translation/index.html',
+  'intelligence/translation/index.html',
   'lab/index.html', 'lab/ci/index.html', 'lab/testing/index.html',
   'developers/index.html', 'developers/build/index.html',
   'developers/contributing/index.html', 'project/index.html',
   'project/origin/index.html', 'project/evolution/index.html',
-  'fa/index.html', 'fa/404.html'
+  'privacy/index.html', 'fa/index.html', 'fa/404.html'
 ];
 const missing = requiredPages.filter((file) => !fs.existsSync(path.join(siteRoot, file)));
 if (missing.length) throw new Error('Missing site pages: ' + missing.join(', '));
@@ -43,7 +43,8 @@ const navigationPages = [
   'lab/index.html',
   'developers/index.html',
   'project/index.html',
-  'fa/index.html'
+  'fa/index.html',
+  'privacy/index.html'
 ];
 for (const file of navigationPages) {
   const content = read(file);
@@ -57,14 +58,14 @@ const metadataPages = [
   ['player/diagnostics/index.html', 'https://voidone.dpdns.org/player/diagnostics/'],
   ['system/architecture/index.html', 'https://voidone.dpdns.org/system/architecture/'],
   ['system/hardware/index.html', 'https://voidone.dpdns.org/system/hardware/'],
-  ['intelligence/ai/index.html', 'https://voidone.dpdns.org/intelligence/ai/'],
   ['intelligence/translation/index.html', 'https://voidone.dpdns.org/intelligence/translation/'],
   ['lab/ci/index.html', 'https://voidone.dpdns.org/lab/ci/'],
   ['lab/testing/index.html', 'https://voidone.dpdns.org/lab/testing/'],
   ['developers/build/index.html', 'https://voidone.dpdns.org/developers/build/'],
   ['developers/contributing/index.html', 'https://voidone.dpdns.org/developers/contributing/'],
   ['project/origin/index.html', 'https://voidone.dpdns.org/project/origin/'],
-  ['project/evolution/index.html', 'https://voidone.dpdns.org/project/evolution/']
+  ['project/evolution/index.html', 'https://voidone.dpdns.org/project/evolution/'],
+  ['privacy/index.html', 'https://voidone.dpdns.org/privacy/']
 ];
 for (const [file, url] of metadataPages) {
   const content = read(file);
